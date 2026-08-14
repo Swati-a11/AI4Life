@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --bg-canvas: #F4F3EE;
+    --fg-primary: #111318;
+    --fg-secondary: #4F5561;
+    --fg-muted: #717885;
+    
+    --brand-accent: #3157D5;
+    --brand-accent-glow: rgba(49, 87, 213, 0.12);
+    --brand-coral: #E56B4E;
+    --brand-teal: #0D9488;
+    
+    --card-bg: #FFFFFF;
+    --card-hover: #FAFAFA;
+    --card-border: #DCDDD8;
+    --card-shadow: 0 20px 50px rgba(20, 30, 50, 0.08);
+    
+    --grid-pattern: rgba(17, 19, 24, 0.035);
+  }
+
+  .dark {
+    --bg-canvas: #080B12;
+    --fg-primary: #FFFFFF;
+    --fg-secondary: #B8C0CC;
+    --fg-muted: #8B95A5;
+    
+    --brand-accent: #4F8CFF;
+    --brand-accent-glow: rgba(79, 140, 255, 0.15);
+    --brand-coral: #F97316;
+    --brand-teal: #38D9C5;
+    
+    --card-bg: #111722;
+    --card-hover: #161E2B;
+    --card-border: rgba(255, 255, 255, 0.10);
+    --card-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    
+    --grid-pattern: rgba(255, 255, 255, 0.03);
+  }
+}
+
+html, body {
+  background-color: var(--bg-canvas);
+  color: var(--fg-primary);
+  scroll-behavior: smooth;
+  font-family: var(--font-body), system-ui, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Subtle Faint Background Grid Texture */
+.bg-grid-texture {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, var(--grid-pattern) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-pattern) 1px, transparent 1px);
+}
+
+/* Glassmorphism panel */
+.glass-panel {
+  background-color: rgba(244, 243, 238, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--card-border);
+}
+
+.dark .glass-panel {
+  background-color: rgba(8, 11, 18, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--card-border);
+}
+
+/* Card Styling */
+.premium-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.premium-card:hover {
+  background-color: var(--card-hover);
+}
+
+/* Radial Glow Effects */
+.radial-blue-glow {
+  background: radial-gradient(circle, rgba(79, 140, 255, 0.15) 0%, transparent 70%);
+}
+
+.radial-teal-glow {
+  background: radial-gradient(circle, rgba(56, 217, 197, 0.15) 0%, transparent 70%);
+}
+
+.radial-coral-glow {
+  background: radial-gradient(circle, rgba(229, 107, 78, 0.15) 0%, transparent 70%);
+}
+
+/* Typography Hierarchy Utilities */
+.hero-headline {
+  font-size: clamp(48px, 7vw, 96px);
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+}
+
+.section-headline {
+  font-size: clamp(36px, 5vw, 64px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.card-title {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.body-lead {
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.small-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-canvas);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--fg-muted);
+  border-radius: 3px;
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
+}
