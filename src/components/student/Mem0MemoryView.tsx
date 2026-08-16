@@ -10,16 +10,40 @@ export function Mem0MemoryView() {
   const [newCat, setNewCat] = useState("");
   const [newPref, setNewPref] = useState("");
 
+  const [indicatorMsg, setIndicatorMsg] = useState<string | null>(null);
+
   useEffect(() => {
-    Mem0Service.getStudentContext().then(setPreferences);
+    fetch("/api/memory")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.preferences) {
+          setPreferences(data.preferences);
+        }
+      })
+      .catch(console.error);
   }, []);
 
   const handleAdd = async () => {
     if (!newCat.trim() || !newPref.trim()) return;
-    const created = await Mem0Service.addPreference(newCat, newPref);
-    setPreferences((prev) => [...prev, created]);
-    setNewCat("");
-    setNewPref("");
+
+    try {
+      const res = await fetch("/api/memory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: newCat, preference: newPref })
+      });
+
+      const data = await res.json();
+      if (data.success && data.preference) {
+        setPreferences((prev) => [data.preference, ...prev]);
+        setIndicatorMsg(data.indicatorText || "AI4Life remembered your preference.");
+        setNewCat("");
+        setNewPref("");
+        setTimeout(() => setIndicatorMsg(null), 4000);
+      }
+    } catch (err) {
+      console.error("Mem0 API Error:", err);
+    }
   };
 
   return (

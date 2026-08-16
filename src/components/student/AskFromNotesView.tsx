@@ -45,17 +45,48 @@ export function AskFromNotesView({ onDeductCredits }: AskFromNotesViewProps) {
     ]
   });
 
+  const [isGrounded, setIsGrounded] = useState(true);
+
   const handleRagSearch = async () => {
     if (!query.trim()) return;
     const hasCredits = onDeductCredits(10);
     if (!hasCredits) return;
 
     setIsSearching(true);
-    setTimeout(async () => {
-      const res = await QdrantRAGService.queryVectorStore(query);
-      setRagResult(res);
+    try {
+      const res = await fetch("/api/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query,
+          documentId: selectedDoc === "all" ? undefined : selectedDoc
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setIsGrounded(Boolean(data.isGrounded));
+        setRagResult({
+          answerText: data.responseText || "No response received.",
+          citations: data.citations || []
+        });
+      } else {
+        setIsGrounded(false);
+        setRagResult({
+          answerText: "I couldn't find this in your uploaded material.",
+          citations: []
+        });
+      }
+    } catch (err) {
+      console.error("Ask From Notes API error:", err);
+      setIsGrounded(false);
+      setRagResult({
+        answerText: "Couldn't query notes at this time. Please try again.",
+        citations: []
+      });
+    } finally {
       setIsSearching(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -120,7 +151,9 @@ export function AskFromNotesView({ onDeductCredits }: AskFromNotesViewProps) {
                 <Sparkles className="w-4 h-4" />
                 Grounded AI Answer
               </span>
-              <span className="text-[11px] text-slate-400">Indexed in Qdrant</span>
+              <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold ${isGrounded ? "bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/30" : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"}`}>
+                {isGrounded ? "Answer based on your notes" : "Not found in notes"}
+              </span>
             </div>
 
             <div className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">

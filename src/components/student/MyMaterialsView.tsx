@@ -71,23 +71,56 @@ export function MyMaterialsView({ onTabChange }: MyMaterialsViewProps) {
     }
   ]);
 
-  const handleSimulatedUpload = () => {
+  const [uploadStatusText, setUploadStatusText] = useState<string | null>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadStatusText("File exceeds maximum size of 10MB.");
+      setTimeout(() => setUploadStatusText(null), 4000);
+      return;
+    }
+
     setIsUploading(true);
-    setTimeout(() => {
-      const newMat: StudyMaterial = {
-        id: `mat_${Date.now()}`,
-        title: "Database_Management_Notes.pdf",
-        subject: "Computer Science",
-        fileType: "pdf",
-        sizeMb: 2.5,
-        uploadedAt: "Just now",
-        status: "Ready",
-        chunksCount: 30,
-        qdrantCollectionRef: `qdrant_db_${Date.now()}`
-      };
-      setMaterials((prev) => [newMat, ...prev]);
+    setUploadStatusText("Uploading...");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      setUploadStatusText("Processing...");
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json();
+      if (data.success && data.document) {
+        const newMat: StudyMaterial = {
+          id: data.document.id,
+          title: data.document.title,
+          subject: "Computer Science",
+          fileType: data.document.title.endsWith(".pdf") ? "pdf" : "docx",
+          sizeMb: data.document.sizeMb,
+          uploadedAt: "Just now",
+          status: "Ready",
+          chunksCount: data.document.chunksGenerated,
+          qdrantCollectionRef: `qdrant_${data.document.id}`
+        };
+        setMaterials((prev) => [newMat, ...prev]);
+        setUploadStatusText("Ready");
+      } else {
+        setUploadStatusText(data.error || "Couldn't process this file.");
+      }
+    } catch (err) {
+      console.error("Upload API error:", err);
+      setUploadStatusText("Couldn't process this file.");
+    } finally {
       setIsUploading(false);
-    }, 1500);
+      setTimeout(() => setUploadStatusText(null), 4000);
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -114,15 +147,24 @@ export function MyMaterialsView({ onTabChange }: MyMaterialsViewProps) {
           </p>
         </div>
 
-        <button
-          onClick={handleSimulatedUpload}
-          disabled={isUploading}
-          className="px-5 py-3 rounded-2xl bg-[#3157D5] dark:bg-[#4F8CFF] text-white font-bold text-xs hover:bg-[#2848b8] transition-colors flex items-center gap-2 shadow-md"
-          type="button"
-        >
-          <Upload className="w-4 h-4" />
-          <span>{isUploading ? "Uploading & Chunking..." : "Upload New File"}</span>
-        </button>
+        <div className="flex flex-col items-end gap-2">
+          <label className="px-5 py-3 rounded-2xl bg-[#3157D5] dark:bg-[#4F8CFF] text-white font-bold text-xs hover:bg-[#2848b8] transition-colors flex items-center gap-2 shadow-md cursor-pointer">
+            <Upload className="w-4 h-4" />
+            <span>{isUploading ? (uploadStatusText || "Processing...") : "Upload New File"}</span>
+            <input
+              type="file"
+              accept=".pdf,.docx,.txt"
+              onChange={handleFileUpload}
+              className="hidden"
+              disabled={isUploading}
+            />
+          </label>
+          {uploadStatusText && (
+            <span className="text-[11px] font-bold text-teal-600 dark:text-teal-400">
+              {uploadStatusText}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Filter & Search Controls */}

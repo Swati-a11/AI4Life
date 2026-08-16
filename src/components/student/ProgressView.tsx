@@ -1,9 +1,27 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { BarChart2, TrendingUp, Clock, CheckCircle2, Trophy, Flame, Target, BookOpen } from "lucide-react";
 
 export function ProgressView() {
+  const [progressData, setProgressData] = useState<any>(null);
+  const [hasActivity, setHasActivity] = useState<boolean>(true);
+
+  useEffect(() => {
+    fetch("/api/progress")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setHasActivity(Boolean(data.hasActivity));
+          if (data.progress) {
+            setProgressData(data.progress);
+          }
+        }
+      })
+      .catch(console.error);
+  }, []);
+
   const weeklyData = [
     { day: "Mon", hours: 2.5 },
     { day: "Tue", hours: 4.0 },

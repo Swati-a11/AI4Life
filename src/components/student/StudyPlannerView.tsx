@@ -28,11 +28,17 @@ export function StudyPlannerView({ onDeductCredits }: StudyPlannerViewProps) {
     if (!hasCredits) return;
 
     setIsGenerating(true);
-    setTimeout(async () => {
-      const generatedTasks = await GeminiAIService.generateStudyPlan(examName, 5);
-      setTasks(generatedTasks);
+    try {
+      const res = await fetch("/api/planner");
+      const data = await res.json();
+      if (data.success && data.tasks) {
+        setTasks(data.tasks);
+      }
+    } catch (err) {
+      console.error("Planner API error:", err);
+    } finally {
       setIsGenerating(false);
-    }, 1200);
+    }
   };
 
   const handleToggleTask = (id: string) => {

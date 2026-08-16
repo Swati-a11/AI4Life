@@ -26,17 +26,32 @@ export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
     setQuizSubmitted(false);
     setUserAnswers({});
 
-    setTimeout(async () => {
-      const questions = await GeminiAIService.generateQuizFromDocument(selectedSource, 4, difficulty);
-      setActiveQuiz({
-        id: `quiz_${Date.now()}`,
-        title: `Quiz on ${selectedSource}`,
-        subject: "Computer Science",
-        difficulty,
-        questions,
+    try {
+      const res = await fetch("/api/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: selectedSource,
+          questionCount: 4,
+          difficulty
+        })
       });
+
+      const data = await res.json();
+      if (data.success && data.questions) {
+        setActiveQuiz({
+          id: `quiz_${Date.now()}`,
+          title: `Quiz on ${selectedSource}`,
+          subject: "Computer Science",
+          difficulty,
+          questions: data.questions
+        });
+      }
+    } catch (err) {
+      console.error("Quiz API Error:", err);
+    } finally {
       setIsGenerating(false);
-    }, 1200);
+    }
   };
 
   const handleSelectOption = (questionIdx: number, optionIdx: number) => {
@@ -44,7 +59,7 @@ export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
     setUserAnswers((prev) => ({ ...prev, [questionIdx]: optionIdx }));
   };
 
-  const handleSubmitQuiz = () => {
+  const handleSubmitQuiz = async () => {
     if (!activeQuiz) return;
     let correctCount = 0;
     activeQuiz.questions.forEach((q, idx) => {
@@ -53,6 +68,24 @@ export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
     const finalScore = Math.round((correctCount / activeQuiz.questions.length) * 100);
     setActiveQuiz((prev) => (prev ? { ...prev, score: finalScore } : null));
     setQuizSubmitted(true);
+
+    // Record quiz attempt to server progress store
+    try {
+      await fetch("/api/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recordAttempt: true,
+          attemptData: {
+            topic: selectedSource,
+            score: correctCount,
+            total: activeQuiz.questions.length
+          }
+        })
+      });
+    } catch (err) {
+      console.error("Failed to record quiz attempt:", err);
+    }
   };
 
   return (

@@ -67,19 +67,44 @@ export function AITutorView({ onDeductCredits }: AITutorViewProps) {
     if (!queryText) setInputQuery("");
     setIsGenerating(true);
 
-    setTimeout(async () => {
-      const aiResponse = await GeminiAIService.generateTutorResponse(textToSend, selectedMode);
+    try {
+      const res = await fetch("/api/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: textToSend,
+          mode: selectedMode,
+          memoryContext: "Prefers concise, intuitive explanations with examples"
+        })
+      });
+
+      const data = await res.json();
+      const aiText = data.success && data.responseText 
+        ? data.responseText 
+        : "Couldn't generate a response. Please try again.";
+
       const aiMsg: ChatMessage = {
         id: `ai_${Date.now()}`,
         sender: "ai",
-        text: aiResponse.responseText,
-        codeSnippet: aiResponse.codeSnippet,
+        text: aiText,
+        codeSnippet: data.codeSnippet,
         mode: selectedMode,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setMessages((prev) => [...prev, aiMsg]);
+    } catch (err) {
+      console.error("AI Tutor API Error:", err);
+      const errorMsg: ChatMessage = {
+        id: `err_${Date.now()}`,
+        sender: "ai",
+        text: "Couldn't generate a response. Please try again.",
+        mode: selectedMode,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
       setIsGenerating(false);
-    }, 900);
+    }
   };
 
   const handleCopy = (id: string, text: string) => {

@@ -29,17 +29,42 @@ export function ChallengeModeView({ onDeductCredits }: ChallengeModeViewProps) {
     setSelectedOption(null);
     setBattleState("ready");
 
-    const newMatch = await GeminiAIService.generateChallengeMatch(topicInput);
-    setMatch(newMatch);
-    setIsBattleActive(true);
+    try {
+      const res = await fetch("/api/challenge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "generate", topic: topicInput })
+      });
+
+      const data = await res.json();
+      if (data.success && data.questions && data.questions.length > 0) {
+        const q = data.questions[0];
+        const newMatch: ChallengeMatch = {
+          id: data.challengeId || `match_${Date.now()}`,
+          topic: data.topic || topicInput,
+          question: q.question,
+          options: q.options,
+          correctOptionIndex: q.correctOptionIndex,
+          aiAnswerIndex: q.correctOptionIndex,
+          aiExplanation: q.explanation,
+          studentScore: 0,
+          aiScore: 0,
+          xpEarned: 150
+        };
+        setMatch(newMatch);
+        setIsBattleActive(true);
+      }
+    } catch (err) {
+      console.error("Challenge API error:", err);
+    }
   };
 
-  const handleLockAnswer = (optIdx: number) => {
+  const handleLockAnswer = async (optIdx: number) => {
     if (battleState !== "ready") return;
     setSelectedOption(optIdx);
     setBattleState("thinking");
 
-    setTimeout(() => {
+    setTimeout(async () => {
       if (!match) return;
       const studentCorrect = optIdx === match.correctOptionIndex;
       const newStudentScore = studentCorrect ? studentScore + 1 : studentScore;
@@ -63,7 +88,23 @@ export function ChallengeModeView({ onDeductCredits }: ChallengeModeViewProps) {
           : null
       );
       setBattleState("completed");
-    }, 1400);
+
+      // Submit match result to server progress store
+      try {
+        await fetch("/api/challenge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "submit",
+            topic: match.topic,
+            challengeId: match.id,
+            answers: [{ questionIndex: 0, selectedOption: optIdx, correctOption: match.correctOptionIndex }]
+          })
+        });
+      } catch (err) {
+        console.error("Failed to submit challenge result:", err);
+      }
+    }, 1200);
   };
 
   return (
