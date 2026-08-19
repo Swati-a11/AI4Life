@@ -30,7 +30,6 @@ export default function RootLayout({
   const isValidKey = Boolean(
     rawPubKey &&
     rawPubKey.startsWith("pk_") &&
-    !rawPubKey.includes("vercel.app") &&
     !rawPubKey.includes("your_clerk_pub_key")
   );
   const pubKey = isValidKey ? rawPubKey : undefined;

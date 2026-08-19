@@ -5,7 +5,8 @@ export class AuthService {
   static async getUserIdFromRequest(req?: Request): Promise<string> {
     try {
       const pubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-      if (pubKey && pubKey.startsWith("pk_") && !pubKey.includes("your_")) {
+      const secKey = process.env.CLERK_SECRET_KEY;
+      if (pubKey && secKey && pubKey.startsWith("pk_") && !pubKey.includes("your_")) {
         const { userId } = await auth();
         if (userId) {
           return userId;
