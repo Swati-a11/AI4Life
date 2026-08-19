@@ -13,10 +13,27 @@ export class CreditService {
   private static processedTransactions = new Set<string>();
   private static transactionLogs: CreditTransaction[] = [];
 
+  private static getStoredCredits(key: string): number {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem(`ai4life_credits_${key}`);
+      if (stored !== null) {
+        const parsed = parseInt(stored, 10);
+        if (!isNaN(parsed)) return parsed;
+      }
+      const genericStored = localStorage.getItem("ai4life_credits");
+      if (genericStored !== null) {
+        const parsed = parseInt(genericStored, 10);
+        if (!isNaN(parsed)) return parsed;
+      }
+    }
+    return 420;
+  }
+
   private static getInitialCredits(userId?: string): number {
-    const key = userId || "default_user";
+    const key = userId || "anonymous_student_user";
     if (!this.userCreditsMap.has(key)) {
-      this.userCreditsMap.set(key, 420);
+      const val = this.getStoredCredits(key);
+      this.userCreditsMap.set(key, val);
     }
     return this.userCreditsMap.get(key)!;
   }
@@ -29,9 +46,9 @@ export class CreditService {
     cost: number = 20,
     userId?: string,
     idempotencyKey?: string,
-    description: string = "AI Se Baazi Challenge"
-  ): { success: boolean; remainingCredits: number; alreadyProcessed?: boolean } {
-    const key = userId || "default_user";
+    description: string = "AI Action"
+  ): { success: boolean; remainingCredits: number; alreadyProcessed?: boolean; error?: string } {
+    const key = userId || "anonymous_student_user";
     const current = this.getInitialCredits(key);
 
     if (idempotencyKey && this.processedTransactions.has(`${key}_deduct_${idempotencyKey}`)) {
@@ -41,6 +58,11 @@ export class CreditService {
     if (current >= cost) {
       const remaining = current - cost;
       this.userCreditsMap.set(key, remaining);
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`ai4life_credits_${key}`, remaining.toString());
+        localStorage.setItem("ai4life_credits", remaining.toString());
+      }
 
       if (idempotencyKey) {
         this.processedTransactions.add(`${key}_deduct_${idempotencyKey}`);
@@ -59,16 +81,20 @@ export class CreditService {
       return { success: true, remainingCredits: remaining };
     }
 
-    return { success: false, remainingCredits: current };
+    return { 
+      success: false, 
+      remainingCredits: current, 
+      error: "Insufficient credits. Please upgrade your plan to continue." 
+    };
   }
 
   static addCredits(
     amount: number = 20,
     userId?: string,
     idempotencyKey?: string,
-    description: string = "Quiz Completion Reward"
+    description: string = "Credit Purchase / Reward"
   ): { remainingCredits: number; alreadyProcessed?: boolean } {
-    const key = userId || "default_user";
+    const key = userId || "anonymous_student_user";
     const current = this.getInitialCredits(key);
 
     if (idempotencyKey && this.processedTransactions.has(`${key}_reward_${idempotencyKey}`)) {
@@ -77,6 +103,11 @@ export class CreditService {
 
     const updated = current + amount;
     this.userCreditsMap.set(key, updated);
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`ai4life_credits_${key}`, updated.toString());
+      localStorage.setItem("ai4life_credits", updated.toString());
+    }
 
     if (idempotencyKey) {
       this.processedTransactions.add(`${key}_reward_${idempotencyKey}`);
@@ -96,7 +127,7 @@ export class CreditService {
   }
 
   static getTransactionHistory(userId?: string): CreditTransaction[] {
-    const key = userId || "default_user";
+    const key = userId || "anonymous_student_user";
     return this.transactionLogs.filter((t) => !t.userId || t.userId === key);
   }
 }

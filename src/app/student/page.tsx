@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { StudentTab } from "@/lib/types/student-types";
 import { StudentShell } from "@/components/student/StudentShell";
 import { DashboardView } from "@/components/student/DashboardView";
@@ -16,24 +15,19 @@ import { SavedView } from "@/components/student/SavedView";
 import { Mem0MemoryView } from "@/components/student/Mem0MemoryView";
 import { TavilyResearchView } from "@/components/student/TavilyResearchView";
 import { CreditService } from "@/lib/services/credit-service";
+import { getOrCreateLocalUserId } from "@/lib/utils/user-id-utils";
 
 export default function StudentWorkspacePage() {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<StudentTab>("dashboard");
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   useEffect(() => {
-    // Redirect to landing page if user refreshes the browser while on student workspace
-    if (typeof window !== "undefined") {
-      const navEntries = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
-      if (navEntries.length > 0 && navEntries[0].type === "reload") {
-        router.replace("/");
-      }
-    }
-  }, [router]);
+    getOrCreateLocalUserId();
+  }, []);
 
-  const handleDeductCredits = (cost: number = 10): boolean => {
-    const res = CreditService.deductCredits(cost);
+  const handleDeductCredits = (cost: number = 20): boolean => {
+    const userId = getOrCreateLocalUserId();
+    const res = CreditService.deductCredits(cost, userId);
     if (!res.success) {
       setIsUpgradeModalOpen(true);
     }

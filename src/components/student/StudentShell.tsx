@@ -25,6 +25,7 @@ import { StudentTab } from "@/lib/types/student-types";
 import { ThemeToggle } from "../ThemeToggle";
 import { CreditService } from "@/lib/services/credit-service";
 import { UpgradeModal } from "./UpgradeModal";
+import { getOrCreateLocalUserId } from "@/lib/utils/user-id-utils";
 
 interface StudentShellProps {
   currentTab: StudentTab;
@@ -33,7 +34,7 @@ interface StudentShellProps {
 }
 
 export function StudentShell({ currentTab, onTabChange, children }: StudentShellProps) {
-  const [credits, setCredits] = useState(CreditService.getCredits());
+  const [credits, setCredits] = useState<number>(420);
   const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -46,7 +47,13 @@ export function StudentShell({ currentTab, onTabChange, children }: StudentShell
   const [currentUser, setCurrentUser] = useState<any>({ name: "Swati Kumari", email: "swati@student.ai4life.com" });
 
   useEffect(() => {
-    fetch("/api/auth")
+    const userId = getOrCreateLocalUserId();
+    const currentCredits = CreditService.getCredits(userId);
+    setCredits(currentCredits);
+
+    fetch("/api/auth", {
+      headers: { "x-user-id": userId }
+    })
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.user) {
