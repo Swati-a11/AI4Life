@@ -115,17 +115,17 @@ export function Navbar() {
             <UserButton />
           )}
 
-          {isMounted && !isClerkAvailable && (
+          {(!isMounted || !isClerkAvailable) && (
             <>
               <Link
-                href="/student"
+                href="/sign-in"
                 className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-200/60 dark:hover:bg-slate-800/80 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span>Sign In</span>
               </Link>
               <Link
-                href="/student"
+                href="/sign-up"
                 className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#3157D5] dark:bg-[#4F8CFF] hover:bg-[#2848b8] shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
                 <UserPlus className="w-3.5 h-3.5" />
@@ -214,15 +214,25 @@ export function Navbar() {
                   </div>
                 )}
 
-                {isMounted && !isClerkAvailable && (
-                  <Link
-                    href="/student"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-base font-bold text-white bg-[#3157D5] dark:bg-[#4F8CFF] shadow-md cursor-pointer"
-                  >
-                    <span>Go to Student Workspace</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </Link>
+                {(!isMounted || !isClerkAvailable) && (
+                  <>
+                    <Link
+                      href="/sign-in"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-base font-bold text-slate-900 dark:text-white border border-slate-300 dark:border-slate-800 cursor-pointer"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      <span>Sign In</span>
+                    </Link>
+                    <Link
+                      href="/sign-up"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-base font-bold text-white bg-[#3157D5] dark:bg-[#4F8CFF] shadow-md cursor-pointer"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      <span>Sign Up Free</span>
+                    </Link>
+                  </>
                 )}
               </div>
             </div>
