@@ -50,6 +50,28 @@ html, body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* Hide Clerk Keyless Mode Banner & Missing API Key Alerts */
+[class*="cl-keyless"],
+[id*="clerk-keyless"],
+.cl-keyless-banner,
+[data-clerk-overlay],
+div:has(a[href*="claim"]),
+div:has(a[href*="dashboard.clerk.com"]),
+div:has(a[href*="clerk.com"]),
+body > div:has(a[href*="dashboard.clerk.com"]),
+iframe[src*="clerk"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  position: absolute !important;
+  left: -9999px !important;
+  top: -9999px !important;
+}
+
 /* Subtle Faint Background Grid Texture */
 .bg-grid-texture {
   background-size: 40px 40px;
