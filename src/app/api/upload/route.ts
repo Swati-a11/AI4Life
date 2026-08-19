@@ -132,9 +132,9 @@ export async function POST(req: NextRequest) {
     let transcriptionStatus: "pending" | "completed" | "no_audio" | "failed" | undefined = undefined;
     let error: string | undefined = undefined;
 
-    // Parse PDF Document: Server-Side PDF Stream Decompressor
+    // Parse PDF Document: Server-Side PDF Stream Decompressor with pdf-parse
     if (sourceType === "pdf" || file.type === "application/pdf") {
-      const pdfParsed = PdfService.extractTextFromPdfBuffer(buffer);
+      const pdfParsed = await PdfService.extractTextFromPdfBufferAsync(buffer);
 
       if (pdfParsed.success && pdfParsed.pages.length > 0) {
         processingStatus = "ready";
@@ -145,11 +145,11 @@ export async function POST(req: NextRequest) {
         }));
       } else {
         processingStatus = "failed";
-        error = pdfParsed.error || "This PDF appears to contain scanned pages. Text extraction is unavailable for this file.";
+        error = pdfParsed.error || "This PDF does not contain selectable text. OCR is required to read its content.";
         chunks = [
           {
             id: `pdf_c_fail_${Date.now()}`,
-            text: "This PDF appears to contain scanned pages. Text extraction is unavailable for this file.",
+            text: "This PDF does not contain selectable text. OCR is required to read its content.",
             page: 1
           }
         ];

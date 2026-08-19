@@ -39,7 +39,92 @@ export class PdfService {
       .trim();
   }
 
-  // Server-side PDF text extraction using Node zlib decompressor
+  // Synchronous/Async PDF text extraction using robust pdf-parse library with native stream fallback
+  public static async extractTextFromPdfBufferAsync(buffer: Buffer): Promise<ParsedPdfResult> {
+    try {
+      // 1. Try robust pdf-parse library first
+      let pdfParse: any = null;
+      try {
+        pdfParse = require("pdf-parse");
+      } catch (e) {
+        // Module load fallback
+      }
+
+      if (pdfParse) {
+        try {
+          const fn = typeof pdfParse === "function" ? pdfParse : pdfParse.default || pdfParse;
+          if (typeof fn === "function") {
+            const pageTexts: { page: number; text: string }[] = [];
+            let currentPage = 1;
+
+            const data = await fn(buffer, {
+              pagerender: (pageData: any) => {
+                return pageData.getTextContent().then((textContent: any) => {
+                  let lastY: number | null = null;
+                  let pageStr = "";
+                  for (const item of textContent.items) {
+                    if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) {
+                      pageStr += "\n";
+                    }
+                    pageStr += item.str + " ";
+                    lastY = item.transform[5];
+                  }
+                  const cleanStr = PdfService.normalizeExtractedText(pageStr);
+                  if (cleanStr.length > 0 && !PdfService.containsRawPdfBytes(cleanStr)) {
+                    pageTexts.push({
+                      page: currentPage++,
+                      text: cleanStr
+                    });
+                  }
+                  return pageStr;
+                });
+              }
+            });
+
+            if (pageTexts.length > 0) {
+              const fullText = pageTexts.map((p) => `Page ${p.page}\n\n${p.text}`).join("\n\n---\n\n");
+              return {
+                success: true,
+                fullText,
+                pages: pageTexts
+              };
+            }
+
+            if (data && data.text) {
+              const cleanFull = PdfService.normalizeExtractedText(data.text);
+              if (cleanFull.length > 10 && !PdfService.containsRawPdfBytes(cleanFull)) {
+                const paragraphs = cleanFull.split("\n\n").filter((p) => p.trim().length > 0);
+                const pages = paragraphs.map((pText, i) => ({
+                  page: Math.floor(i / 4) + 1,
+                  text: pText
+                }));
+                return {
+                  success: true,
+                  fullText: cleanFull,
+                  pages
+                };
+              }
+            }
+          }
+        } catch (parseErr) {
+          console.warn("pdf-parse execution warning, falling back to stream extraction:", parseErr);
+        }
+      }
+
+      // 2. Fallback stream parser with strict binary symbol filtering
+      return this.extractTextFromPdfBuffer(buffer);
+    } catch (err) {
+      console.error("Error in PdfService.extractTextFromPdfBufferAsync:", err);
+      return {
+        success: false,
+        fullText: "Could not extract readable content from this PDF.",
+        pages: [],
+        error: "Could not extract readable content from this PDF."
+      };
+    }
+  }
+
+  // Server-side PDF text extraction stream fallback with strict binary guard
   public static extractTextFromPdfBuffer(buffer: Buffer): ParsedPdfResult {
     try {
       const pdfString = buffer.toString("binary");
@@ -50,7 +135,7 @@ export class PdfService {
           success: false,
           fullText: "Could not extract readable content from this PDF.",
           pages: [],
-          error: "Could not extract readable text from this PDF."
+          error: "Could not extract readable content from this PDF."
         };
       }
 
@@ -79,7 +164,7 @@ export class PdfService {
         const tjRegex = /\(([^)]+)\)\s*Tj/g;
         let tjMatch: RegExpExecArray | null;
         while ((tjMatch = tjRegex.exec(decompressedText)) !== null) {
-          if (tjMatch[1]) {
+          if (tjMatch[1] && !this.containsRawPdfBytes(tjMatch[1])) {
             pageTextParts.push(tjMatch[1]);
           }
         }
@@ -93,7 +178,9 @@ export class PdfService {
           let innerMatch: RegExpExecArray | null;
           let line = "";
           while ((innerMatch = innerTextRegex.exec(inner)) !== null) {
-            line += innerMatch[1];
+            if (!this.containsRawPdfBytes(innerMatch[1])) {
+              line += innerMatch[1];
+            }
           }
           if (line.trim().length > 0) {
             pageTextParts.push(line);
@@ -138,9 +225,9 @@ export class PdfService {
       if (pages.length === 0) {
         return {
           success: false,
-          fullText: "This PDF appears to contain scanned pages. Text extraction is unavailable for this file.",
+          fullText: "This PDF does not contain selectable text. OCR is required to read its content.",
           pages: [],
-          error: "This PDF appears to contain scanned pages. Text extraction is unavailable for this file."
+          error: "This PDF does not contain selectable text. OCR is required to read its content."
         };
       }
 
@@ -157,7 +244,7 @@ export class PdfService {
         success: false,
         fullText: "Could not extract readable content from this PDF.",
         pages: [],
-        error: "Could not extract readable text from this PDF."
+        error: "Could not extract readable content from this PDF."
       };
     }
   }
@@ -209,7 +296,7 @@ export class PdfService {
     return [
       {
         id: `clean_c_failed`,
-        text: `Could not extract readable content from this source file.`,
+        text: `This PDF does not contain selectable text. OCR is required to read its content.`,
         page: 1
       }
     ];
