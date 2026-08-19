@@ -27,7 +27,15 @@ export default function middleware(req: NextRequest, evt: any) {
 
   return clerkMiddleware(async (auth, request) => {
     if (isProtectedRoute(request)) {
-      await auth.protect();
+      const authObj = await auth();
+      if (!authObj.userId) {
+        if (request.nextUrl.pathname.startsWith("/api/")) {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        const signInUrl = new URL("/sign-in", request.url);
+        signInUrl.searchParams.set("redirect_url", request.url);
+        return NextResponse.redirect(signInUrl);
+      }
     }
   })(req, evt);
 }
