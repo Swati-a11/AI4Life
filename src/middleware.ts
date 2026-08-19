@@ -14,10 +14,14 @@ const isProtectedRoute = createRouteMatcher([
   "/api/challenge(.*)",
 ]);
 
+const pubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+const secKey = process.env.CLERK_SECRET_KEY;
 const hasClerkKeys = Boolean(
-  process.env.CLERK_SECRET_KEY &&
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.startsWith("pk_")
+  secKey &&
+  pubKey &&
+  pubKey.startsWith("pk_") &&
+  !pubKey.includes("your_clerk_pub_key") &&
+  pubKey.length > 25
 );
 
 export default function middleware(req: NextRequest, evt: any) {
@@ -25,19 +29,29 @@ export default function middleware(req: NextRequest, evt: any) {
     return NextResponse.next();
   }
 
-  return clerkMiddleware(async (auth, request) => {
-    if (isProtectedRoute(request)) {
-      const authObj = await auth();
-      if (!authObj.userId) {
-        if (request.nextUrl.pathname.startsWith("/api/")) {
-          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    return clerkMiddleware(async (auth, request) => {
+      if (isProtectedRoute(request)) {
+        try {
+          const authObj = await auth();
+          if (!authObj.userId) {
+            if (request.nextUrl.pathname.startsWith("/api/")) {
+              return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            }
+            const signInUrl = new URL("/sign-in", request.url);
+            signInUrl.searchParams.set("redirect_url", request.url);
+            return NextResponse.redirect(signInUrl);
+          }
+        } catch (err) {
+          console.warn("Clerk auth check warning in middleware:", err);
         }
-        const signInUrl = new URL("/sign-in", request.url);
-        signInUrl.searchParams.set("redirect_url", request.url);
-        return NextResponse.redirect(signInUrl);
       }
-    }
-  })(req, evt);
+      return NextResponse.next();
+    })(req, evt);
+  } catch (err) {
+    console.error("Middleware Clerk error, bypassing:", err);
+    return NextResponse.next();
+  }
 }
 
 export const config = {
