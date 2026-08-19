@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Zap, Check, Loader2 } from "lucide-react";
-import { useUser } from "@clerk/nextjs";
 
 declare global {
   interface Window {
@@ -50,13 +49,7 @@ const loadRazorpayScript = (): Promise<boolean> => {
 };
 
 export function PricingSimple() {
-  let user: any = null;
-  try {
-    const clerkAuth = useUser();
-    user = clerkAuth ? clerkAuth.user : null;
-  } catch (err) {
-    // Unwrapped Clerk context guard
-  }
+  const user = null;
 
   const [creditUsage, setCreditUsage] = useState(1240);
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
@@ -118,8 +111,8 @@ export function PricingSimple() {
       }
 
       const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || orderData?.keyId || process.env.RAZORPAY_KEY_ID || "rzp_test_SpFs6";
-      const userName = user?.fullName || user?.firstName || "AI4Life Student";
-      const userEmail = user?.primaryEmailAddress?.emailAddress || "student@ai4life.com";
+      const userName = "Swati Kumari";
+      const userEmail = "swati@student.ai4life.com";
 
       // 3. Construct Razorpay Options & open Checkout Gateway directly
       const options = {
@@ -135,7 +128,7 @@ export function PricingSimple() {
         },
         notes: {
           plan: planName,
-          userId: user?.id || "guest",
+          userId: "default_student_user",
         },
         handler: async function (response: any) {
           setPaymentState("processing");
