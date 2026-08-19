@@ -4,13 +4,23 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Menu, X, Zap, LogIn, UserPlus } from "lucide-react";
-import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
+import { useAuth, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
 
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+
+  let isSignedIn = false;
+  let isClerkAvailable = false;
+  try {
+    const authObj = useAuth();
+    isSignedIn = Boolean(authObj.isSignedIn);
+    isClerkAvailable = true;
+  } catch (err) {
+    // Unwrapped or inactive Clerk context guard
+  }
 
   useEffect(() => {
     setIsMounted(true);
@@ -70,11 +80,11 @@ export function Navbar() {
           ))}
         </nav>
 
-        {/* Right: Actions (Sign In, Sign Up, Theme Toggle, User Button) */}
+        {/* Right: Actions (Sign In, Sign Up, Theme Toggle, User Controls) */}
         <div className="hidden md:flex items-center gap-3">
           
-          {isMounted && (
-            <SignedOut>
+          {isMounted && isClerkAvailable && !isSignedIn && (
+            <>
               {/* Sign In Button -> Opens Clerk Authentication Gateway Modal */}
               <SignInButton mode="modal" forceRedirectUrl="/student">
                 <button
@@ -98,13 +108,30 @@ export function Navbar() {
                   <span>Sign Up</span>
                 </motion.button>
               </SignUpButton>
-            </SignedOut>
+            </>
           )}
 
-          {isMounted && (
-            <SignedIn>
-              <UserButton />
-            </SignedIn>
+          {isMounted && isClerkAvailable && isSignedIn && (
+            <UserButton />
+          )}
+
+          {isMounted && !isClerkAvailable && (
+            <>
+              <Link
+                href="/student"
+                className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-200/60 dark:hover:bg-slate-800/80 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </Link>
+              <Link
+                href="/student"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#3157D5] dark:bg-[#4F8CFF] hover:bg-[#2848b8] shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Sign Up</span>
+              </Link>
+            </>
           )}
 
           {/* Light/Dark Theme Toggle */}
@@ -155,38 +182,47 @@ export function Navbar() {
                 </a>
               ))}
               <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-3">
-                {isMounted && (
+                {isMounted && isClerkAvailable && !isSignedIn && (
                   <>
-                    <SignedOut>
-                      <SignInButton mode="modal" forceRedirectUrl="/student">
-                        <button
-                          onClick={() => setMobileMenuOpen(false)}
-                          className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-base font-bold text-slate-900 dark:text-white border border-slate-300 dark:border-slate-800 cursor-pointer"
-                          type="button"
-                        >
-                          <LogIn className="w-4 h-4" />
-                          <span>Sign In</span>
-                        </button>
-                      </SignInButton>
-                      <SignUpButton mode="modal" forceRedirectUrl="/student">
-                        <button
-                          onClick={() => setMobileMenuOpen(false)}
-                          className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-base font-bold text-white bg-[#3157D5] dark:bg-[#4F8CFF] shadow-md cursor-pointer"
-                          type="button"
-                        >
-                          <UserPlus className="w-4 h-4" />
-                          <span>Sign Up Free</span>
-                        </button>
-                      </SignUpButton>
-                    </SignedOut>
-
-                    <SignedIn>
-                      <div className="flex items-center justify-between pt-2">
-                        <span className="text-xs font-bold text-slate-500">Account Profile:</span>
-                        <UserButton />
-                      </div>
-                    </SignedIn>
+                    <SignInButton mode="modal" forceRedirectUrl="/student">
+                      <button
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-base font-bold text-slate-900 dark:text-white border border-slate-300 dark:border-slate-800 cursor-pointer"
+                        type="button"
+                      >
+                        <LogIn className="w-4 h-4" />
+                        <span>Sign In</span>
+                      </button>
+                    </SignInButton>
+                    <SignUpButton mode="modal" forceRedirectUrl="/student">
+                      <button
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-base font-bold text-white bg-[#3157D5] dark:bg-[#4F8CFF] shadow-md cursor-pointer"
+                        type="button"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        <span>Sign Up Free</span>
+                      </button>
+                    </SignUpButton>
                   </>
+                )}
+
+                {isMounted && isClerkAvailable && isSignedIn && (
+                  <div className="flex items-center justify-between pt-2">
+                    <span className="text-xs font-bold text-slate-500">Account Profile:</span>
+                    <UserButton />
+                  </div>
+                )}
+
+                {isMounted && !isClerkAvailable && (
+                  <Link
+                    href="/student"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-base font-bold text-white bg-[#3157D5] dark:bg-[#4F8CFF] shadow-md cursor-pointer"
+                  >
+                    <span>Go to Student Workspace</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
                 )}
               </div>
             </div>
