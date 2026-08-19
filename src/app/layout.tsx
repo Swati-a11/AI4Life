@@ -31,12 +31,9 @@ export default function RootLayout({
     rawPubKey &&
     rawPubKey.startsWith("pk_") &&
     !rawPubKey.includes("your_clerk_pub_key") &&
-    !rawPubKey.includes("vercel.app")
+    !rawPubKey.includes("vercel.app") &&
+    !rawPubKey.includes("clerk-dev-swati-ai4life")
   );
-
-  const pubKey = isKeyValid
-    ? rawPubKey!
-    : "pk_test_Y2xlcmstZGV2LXN3YXRpLWFpNGxpZmUuY2xlcmsuYWNjb3VudHMuZGV2JA";
 
   return (
     <html 
@@ -46,7 +43,18 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col font-sans bg-[var(--bg-canvas)] text-[var(--fg-primary)] selection:bg-blue-500/30 selection:text-blue-200 transition-colors duration-300">
-        <ClerkProvider publishableKey={pubKey}>
+        {isKeyValid ? (
+          <ClerkProvider publishableKey={rawPubKey}>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="dark"
+              enableSystem
+              disableTransitionOnChange
+            >
+              {children}
+            </ThemeProvider>
+          </ClerkProvider>
+        ) : (
           <ThemeProvider
             attribute="class"
             defaultTheme="dark"
@@ -55,7 +63,7 @@ export default function RootLayout({
           >
             {children}
           </ThemeProvider>
-        </ClerkProvider>
+        )}
       </body>
     </html>
   );
