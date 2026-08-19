@@ -32,12 +32,12 @@ export default function RootLayout({
     rawPubKey.startsWith("pk_") &&
     !rawPubKey.includes("your_clerk_pub_key") &&
     !rawPubKey.includes("vercel.app") &&
-    rawPubKey.length > 20
+    rawPubKey.length > 25
   );
 
   const pubKey = isKeyValid
     ? rawPubKey!
-    : "pk_test_Y2xlcmsuYWNjb3VudHMuZGV2JA";
+    : "pk_test_Y2xlcmstZGV2LXN3YXRpLWFpNGxpZmUuY2xlcmsuYWNjb3VudHMuZGV2JA";
 
   return (
     <html 
