@@ -165,14 +165,14 @@ export function KnowledgeGraph3D() {
         {/* Canvas background for node data streams */}
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
 
-        {/* Central MOVA AI Knowledge Core */}
+        {/* Central AI4Life AI Knowledge Core */}
         <div className="relative z-20 flex flex-col items-center justify-center p-6 rounded-3xl glass-card-cyan border border-cyan-400/40 shadow-2xl shadow-cyan-500/20 text-center transform translate-z-12">
           <div className="relative flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 text-slate-950 mb-3 shadow-lg shadow-cyan-400/30 animate-pulse">
             <Zap className="w-8 h-8 fill-current text-slate-950" />
             <span className="absolute -inset-1 rounded-2xl border border-cyan-400/50 animate-ping opacity-30" />
           </div>
           <span className="text-xs font-black uppercase tracking-wider text-cyan-400">
-            MOVA Core
+            AI4Life Core
           </span>
           <span className="text-sm font-bold text-white font-heading mt-0.5">
             Knowledge Engine

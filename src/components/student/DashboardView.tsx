@@ -1,19 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   MessageSquare,
-  Upload,
-  Sparkles,
-  Zap,
-  Search,
-  Clock,
-  CheckCircle2,
-  Trophy,
-  Flame,
-  FileText,
+  ChevronLeft,
+  ChevronRight,
   ArrowRight,
-  BookOpen
+  Sparkles,
+  Calendar as CalendarIcon,
+  BookOpen,
+  Zap,
+  MoreHorizontal
 } from "lucide-react";
 import { StudentTab } from "@/lib/types/student-types";
 
@@ -24,173 +22,441 @@ interface DashboardViewProps {
 }
 
 export function DashboardView({ userName, onTabChange, onOpenUpgradeModal }: DashboardViewProps) {
-  const quickActions = [
-    { label: "Ask AI", icon: MessageSquare, tab: "tutor" as StudentTab, color: "text-[#3157D5] dark:text-[#4F8CFF]", bg: "bg-blue-500/10 border-blue-500/20" },
-    { label: "Upload Notes", icon: Upload, tab: "materials" as StudentTab, color: "text-[#0D9488] dark:text-[#38D9C5]", bg: "bg-teal-500/10 border-teal-500/20" },
-    { label: "Generate Quiz", icon: Sparkles, tab: "quiz-lab" as StudentTab, color: "text-purple-500", bg: "bg-purple-500/10 border-purple-500/20" },
-    { label: "Challenge AI", icon: Zap, tab: "challenge" as StudentTab, color: "text-amber-500", bg: "bg-amber-500/10 border-amber-500/20" },
-    { label: "Research Topic", icon: Search, tab: "research" as StudentTab, color: "text-indigo-500", bg: "bg-indigo-500/10 border-indigo-500/20" },
+  // Real dynamic date calculation
+  const today = new Date();
+  const realYear = today.getFullYear();
+  const realMonthIndex = today.getMonth(); // 0 = Jan, 7 = Aug, etc.
+  const realTodayDate = today.getDate(); // e.g. 19
+
+  const [currentMonthIndex, setCurrentMonthIndex] = useState<number>(realMonthIndex);
+  const [currentYear, setCurrentYear] = useState<number>(realYear);
+  const [selectedDay, setSelectedDay] = useState<number>(realTodayDate);
+
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
   ];
 
-  const recentItems = [
-    { id: "1", title: "Data_Structures_Chapter3.pdf", subject: "Computer Science", time: "2 hours ago", progress: 75, type: "PDF" },
-    { id: "2", title: "Algorithms & Time Complexity", subject: "Software Engineering", time: "Yesterday", progress: 90, type: "Topic" },
-    { id: "3", title: "Binary Search Midterm Quiz", subject: "Algorithms", time: "3 days ago", progress: 100, type: "Quiz" },
-    { id: "4", title: "Operating Systems Lecture 5", subject: "Computer Systems", time: "4 days ago", progress: 40, type: "Note" },
+  // Calculate calendar grid metrics dynamically for current selected month & year
+  const firstDayOfMonth = new Date(currentYear, currentMonthIndex, 1);
+  const daysInMonth = new Date(currentYear, currentMonthIndex + 1, 0).getDate();
+  // Monday-indexed offset (0 = Mon, 1 = Tue, ..., 6 = Sun)
+  const startDayOffset = (firstDayOfMonth.getDay() + 6) % 7;
+
+  // Exactly Two Polished AI Tutor Personas as requested
+  const teachers = [
+    {
+      id: "aarav",
+      name: "Aarav Mehta",
+      role: "Friendly & Patient AI Tutor",
+      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80",
+    },
+    {
+      id: "riya",
+      name: "Riya Kapoor",
+      role: "Structured & Exam-Focused Tutor",
+      avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=120&q=80",
+    },
   ];
+
+  // Real Upcoming events data for Swati
+  const events = [
+    {
+      id: "e1",
+      title: "AI & Machine Learning Workshop",
+      datetime: `${realTodayDate} ${months[realMonthIndex].slice(0, 3)} ${realYear} 14:00`,
+      image: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=200&q=80",
+    },
+    {
+      id: "e2",
+      title: "Data Structures Midterm Quiz",
+      datetime: `${Math.min(realTodayDate + 3, daysInMonth)} ${months[realMonthIndex].slice(0, 3)} ${realYear} 16:30`,
+      image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=200&q=80",
+    },
+  ];
+
+  // Real Schedule items for Swati
+  const scheduleItems = [
+    { day: realTodayDate, title: "AI Tutor & RAG Practice", time: "14:00" },
+    { day: Math.min(realTodayDate + 1, daysInMonth), title: "Algorithms & Time Complexity", time: "16:30" },
+    { day: Math.min(realTodayDate + 3, daysInMonth), title: "System Design & Vector Search", time: "18:00" },
+  ];
+
+  // Real Projects data for Swati
+  const projects = [
+    {
+      id: "p1",
+      title: "AI4Life Student Workspace",
+      image: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=400&q=80",
+    },
+    {
+      id: "p2",
+      title: "RAG Vector Search Analyzer",
+      image: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=400&q=80",
+    },
+  ];
+
+  // Radial progress gauge helper component matching reference screenshot
+  const RadialGauge = ({
+    percentage,
+    label,
+    strokeColor,
+  }: {
+    percentage: number;
+    label: string;
+    strokeColor: string;
+  }) => {
+    const radius = 34;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference - (percentage / 100) * circumference;
+
+    return (
+      <div className="flex flex-col items-center justify-center p-4 rounded-3xl bg-[#DFD7D0]/60 dark:bg-[#17202F] border border-[#D5CBC2]/60 dark:border-slate-800 space-y-2">
+        <span className="text-xs font-bold text-[#3C324A] dark:text-slate-300 font-heading">
+          {label}
+        </span>
+
+        <div className="relative w-24 h-24 flex items-center justify-center">
+          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 80 80">
+            {/* Background Track Circle */}
+            <circle
+              cx="40"
+              cy="40"
+              r={radius}
+              className="stroke-[#D5CBC2]/50 dark:stroke-slate-700/60"
+              strokeWidth="7"
+              fill="transparent"
+            />
+            {/* Progress Circle */}
+            <circle
+              cx="40"
+              cy="40"
+              r={radius}
+              stroke={strokeColor}
+              strokeWidth="7"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              fill="transparent"
+              className="transition-all duration-1000 ease-out"
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-base font-black text-[#3C324A] dark:text-white font-heading">
+              {percentage}%
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const handlePrevMonth = () => {
+    if (currentMonthIndex === 0) {
+      setCurrentMonthIndex(11);
+      setCurrentYear(currentYear - 1);
+    } else {
+      setCurrentMonthIndex(currentMonthIndex - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonthIndex === 11) {
+      setCurrentMonthIndex(0);
+      setCurrentYear(currentYear + 1);
+    } else {
+      setCurrentMonthIndex(currentMonthIndex + 1);
+    }
+  };
 
   return (
-    <div className="space-y-8">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       
-      {/* Top Greeting Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 sm:p-8 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
-        <div className="space-y-2 z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-[#3157D5] dark:text-[#4F8CFF] text-xs font-bold border border-blue-500/20">
-            <Sparkles className="w-3.5 h-3.5" />
-            AI4Life Student Workspace
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white font-heading">
-            Good evening, {userName || "Swati"}
-          </h1>
-          <p className="text-sm text-slate-600 dark:text-slate-300 font-medium">
-            Ready to make today's study session count?
-          </p>
-        </div>
+      {/* LEFT & CENTER MAIN SECTION (2 columns wide on desktop) */}
+      <div className="lg:col-span-2 space-y-6">
+        
+        {/* ROW 1: Linked Teachers + Upcoming Events */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* Linked Teachers Card */}
+          <div className="p-5 rounded-[28px] bg-[#DFD7D0]/40 dark:bg-[#131A28] border border-[#D5CBC2]/70 dark:border-slate-800/80 space-y-4 flex flex-col justify-between shadow-xs">
+            <div className="space-y-4">
+              <h2 className="text-sm font-bold text-[#3C324A] dark:text-slate-300 font-heading">
+                Linked Teachers
+              </h2>
 
-        <button
-          onClick={onOpenUpgradeModal}
-          className="self-start md:self-auto px-5 py-3 rounded-2xl bg-[#3157D5] dark:bg-[#4F8CFF] text-white font-bold text-xs shadow-md hover:bg-[#2848b8] transition-colors flex items-center gap-2 z-10"
-          type="button"
-        >
-          <Zap className="w-4 h-4 fill-current" />
-          <span>Get More Credits</span>
-        </button>
-      </div>
+              <div className="space-y-3">
+                {teachers.map((teacher) => (
+                  <div
+                    key={teacher.id}
+                    className="flex items-center justify-between p-2.5 rounded-2xl bg-[#EFEAE6]/90 dark:bg-[#1A2232] border border-[#D5CBC2]/60 dark:border-slate-800 hover:shadow-xs transition-shadow"
+                  >
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={teacher.avatar}
+                        alt={teacher.name}
+                        className="w-10 h-10 rounded-full object-cover border border-blue-400/60"
+                      />
+                      <div>
+                        <h3 className="text-xs font-bold text-[#3C324A] dark:text-white">
+                          {teacher.name}
+                        </h3>
+                        <p className="text-[10px] text-slate-500 font-medium">
+                          {teacher.role}
+                        </p>
+                      </div>
+                    </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-1">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
-            <span>Study Time Today</span>
-            <Clock className="w-4 h-4 text-blue-500" />
-          </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white font-heading">3.5 hrs</div>
-          <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">+45 mins vs yesterday</div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-1">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
-            <span>Questions Solved</span>
-            <CheckCircle2 className="w-4 h-4 text-teal-500" />
-          </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white font-heading">48</div>
-          <div className="text-[11px] text-slate-500 font-medium">12 RAG notes queries</div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-1">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
-            <span>Quiz Score Avg</span>
-            <Trophy className="w-4 h-4 text-amber-500" />
-          </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white font-heading">92%</div>
-          <div className="text-[11px] text-amber-600 dark:text-amber-400 font-bold">Top 5% in workspace</div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-1">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
-            <span>Study Streak</span>
-            <Flame className="w-4 h-4 text-orange-500 animate-bounce" />
-          </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white font-heading">5 Days</div>
-          <div className="text-[11px] text-orange-600 dark:text-orange-400 font-bold">Best: 12 days</div>
-        </div>
-      </div>
-
-      {/* DASHBOARD QUICK ACTIONS SECTION */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white font-heading">
-          What do you want to do?
-        </h2>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          {quickActions.map((act) => {
-            const Icon = act.icon;
-            return (
-              <motion.button
-                key={act.label}
-                whileHover={{ y: -4, scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => onTabChange(act.tab)}
-                className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all bg-white dark:bg-[#111722] ${act.bg} cursor-pointer group`}
-                type="button"
-              >
-                <div className={`p-3 rounded-xl w-max bg-white dark:bg-slate-900 ${act.color} shadow-xs`}>
-                  <Icon className="w-5 h-5" />
-                </div>
-                <div className="pt-4 flex items-center justify-between">
-                  <span className="text-sm font-bold text-slate-900 dark:text-white font-heading">{act.label}</span>
-                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </motion.button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* CONTINUE LEARNING SECTION */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white font-heading">
-            Continue Learning
-          </h2>
-          <button
-            onClick={() => onTabChange("materials")}
-            className="text-xs font-bold text-[#3157D5] dark:text-[#4F8CFF] hover:underline"
-            type="button"
-          >
-            View All Materials
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {recentItems.map((item) => (
-            <motion.div
-              key={item.id}
-              whileHover={{ y: -3 }}
-              className="p-5 rounded-2xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-4 shadow-xs"
-            >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400">
-                    {item.type}
-                  </span>
-                  <span className="text-slate-400">{item.time}</span>
-                </div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-2">
-                  {item.title}
-                </h3>
-                <span className="text-xs text-slate-500 font-medium">{item.subject}</span>
+                    <button
+                      onClick={() => onTabChange("tutor")}
+                      className="w-8 h-8 rounded-full bg-[#3C324A] dark:bg-slate-700 text-white flex items-center justify-center hover:scale-105 transition-transform cursor-pointer"
+                      title="Send message in AI Tutor"
+                      type="button"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 fill-current" />
+                    </button>
+                  </div>
+                ))}
               </div>
+            </div>
 
-              <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
-                <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
-                  <span>Progress</span>
-                  <span>{item.progress}%</span>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-900 overflow-hidden">
-                  <div className="h-full bg-[#3157D5] dark:bg-[#4F8CFF]" style={{ width: `${item.progress}%` }} />
-                </div>
+            <button
+              onClick={() => onTabChange("tutor")}
+              className="text-xs font-bold text-[#3C324A] dark:text-amber-400 hover:underline inline-flex items-center gap-1 pt-2 self-start cursor-pointer"
+              type="button"
+            >
+              <span>See more</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Upcoming Events Card */}
+          <div className="p-5 rounded-[28px] bg-[#DFD7D0]/40 dark:bg-[#131A28] border border-[#D5CBC2]/70 dark:border-slate-800/80 space-y-4 flex flex-col justify-between shadow-xs">
+            <div className="space-y-4">
+              <h2 className="text-sm font-bold text-[#3C324A] dark:text-slate-300 font-heading">
+                Upcoming events
+              </h2>
+
+              <div className="space-y-3">
+                {events.map((evt) => (
+                  <div
+                    key={evt.id}
+                    onClick={() => onTabChange("planner")}
+                    className="p-3 rounded-full bg-[#EFEAE6]/90 dark:bg-[#1A2232] border border-[#D5CBC2]/60 dark:border-slate-800 flex items-center justify-between gap-3 cursor-pointer hover:shadow-xs transition-all"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={evt.image}
+                        alt={evt.title}
+                        className="w-10 h-10 rounded-full object-cover shrink-0 border border-slate-300/60"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-bold text-[#3C324A] dark:text-white truncate">
+                          {evt.title}
+                        </p>
+                        <span className="text-[9px] font-bold text-slate-500 block">
+                          {evt.datetime}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => onTabChange("planner")}
+              className="text-xs font-bold text-[#3C324A] dark:text-amber-400 hover:underline inline-flex items-center gap-1 pt-2 self-start cursor-pointer"
+              type="button"
+            >
+              <span>See more</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+        </div>
+
+        {/* ROW 2: My Schedule (Interactive Mini Calendar + Schedule Timeline) */}
+        <div className="p-6 rounded-[32px] bg-[#DFD7D0]/40 dark:bg-[#131A28] border border-[#D5CBC2]/70 dark:border-slate-800/80 space-y-4 shadow-xs">
+          <h2 className="text-sm font-bold text-[#3C324A] dark:text-slate-300 font-heading">
+            My schedule
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+            
+            {/* Left: Dynamic Mini Calendar Picker */}
+            <div className="md:col-span-7 p-4 rounded-3xl bg-[#EFEAE6]/90 dark:bg-[#1A2232] border border-[#D5CBC2]/60 dark:border-slate-800 space-y-3">
+              
+              {/* Month Selector Header */}
+              <div className="flex items-center justify-between px-2">
                 <button
-                  onClick={() => onTabChange(item.type === "PDF" ? "ask-notes" : item.type === "Quiz" ? "quiz-lab" : "tutor")}
-                  className="w-full py-2 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1 mt-2"
+                  onClick={handlePrevMonth}
+                  className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-[#DFD7D0]/60 cursor-pointer"
                   type="button"
                 >
-                  <span>Continue</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-bold text-[#3C324A] dark:text-white font-heading">
+                  {months[currentMonthIndex]} {currentYear}
+                </span>
+                <button
+                  onClick={handleNextMonth}
+                  className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-[#DFD7D0]/60 cursor-pointer"
+                  type="button"
+                >
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
-            </motion.div>
-          ))}
+
+              {/* Day Labels */}
+              <div className="grid grid-cols-7 text-center text-[10px] font-bold text-slate-500 tracking-wider">
+                <span>Mon</span>
+                <span>Tue</span>
+                <span>Wed</span>
+                <span>Thu</span>
+                <span>Fri</span>
+                <span>Sat</span>
+                <span>Sun</span>
+              </div>
+
+              {/* Days Grid dynamically generated */}
+              <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium">
+                {/* Empty slots for starting weekday offset */}
+                {Array.from({ length: startDayOffset }).map((_, idx) => (
+                  <div key={`empty-${idx}`} />
+                ))}
+
+                {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
+                  const isSelected = day === selectedDay;
+                  const isToday = day === realTodayDate && currentMonthIndex === realMonthIndex && currentYear === realYear;
+
+                  return (
+                    <button
+                      key={day}
+                      onClick={() => setSelectedDay(day)}
+                      className={`h-7 w-7 mx-auto rounded-full flex items-center justify-center transition-all cursor-pointer relative ${
+                        isSelected
+                          ? "bg-[#3C324A] dark:bg-amber-400 text-white dark:text-slate-900 font-bold shadow-xs"
+                          : isToday
+                          ? "bg-blue-500/20 text-blue-600 dark:text-blue-400 font-extrabold border border-blue-500/40"
+                          : "text-slate-700 dark:text-slate-300 hover:bg-[#DFD7D0]/50 dark:hover:bg-slate-800"
+                      }`}
+                      type="button"
+                    >
+                      <span>{day}</span>
+                      {isToday && !isSelected && (
+                        <span className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-blue-500" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+            </div>
+
+            {/* Right: Schedule Timeline Items */}
+            <div className="md:col-span-5 flex flex-col justify-center space-y-3">
+              {scheduleItems.map((item) => (
+                <div
+                  key={item.day}
+                  onClick={() => setSelectedDay(item.day)}
+                  className={`p-3 rounded-full border transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                    item.day === selectedDay
+                      ? "bg-[#EFEAE6] dark:bg-[#1F2A3E] border-[#3C324A] dark:border-amber-400 shadow-xs"
+                      : "bg-[#EFEAE6]/60 dark:bg-[#1A2232]/80 border-[#D5CBC2]/60 dark:border-slate-800"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-[#DFD7D0] dark:bg-slate-800 text-[#3C324A] dark:text-white font-black text-xs flex items-center justify-center shrink-0">
+                      {item.day}
+                    </div>
+                    <span className="text-xs font-bold text-[#3C324A] dark:text-white">
+                      {item.title}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-500 pr-2">
+                    {item.time}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        </div>
+
+        {/* ROW 3: My Projects Card */}
+        <div className="p-6 rounded-[32px] bg-[#DFD7D0]/40 dark:bg-[#131A28] border border-[#D5CBC2]/70 dark:border-slate-800/80 space-y-4 shadow-xs">
+          <h2 className="text-sm font-bold text-[#3C324A] dark:text-slate-300 font-heading">
+            My projects
+          </h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {projects.map((proj) => (
+              <motion.div
+                key={proj.id}
+                whileHover={{ y: -3 }}
+                onClick={() => onTabChange("materials")}
+                className="p-3 rounded-[24px] bg-[#EFEAE6]/90 dark:bg-[#1A2232] border border-[#D5CBC2]/60 dark:border-slate-800 space-y-3 cursor-pointer group shadow-xs"
+              >
+                <div className="w-full h-36 rounded-2xl overflow-hidden relative">
+                  <img
+                    src={proj.image}
+                    alt={proj.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+                <div className="px-2 pb-1">
+                  <span className="text-xs font-bold text-[#3C324A] dark:text-white">
+                    {proj.title}
+                  </span>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+
+      {/* RIGHT SIDEBAR STATS PANEL */}
+      <div className="lg:col-span-1">
+        <div className="p-6 rounded-[36px] bg-[#DFD7D0]/40 dark:bg-[#131A28] border border-[#D5CBC2]/70 dark:border-slate-800/80 space-y-6 flex flex-col justify-between min-h-full shadow-xs">
+          
+          <div className="space-y-6">
+            
+            {/* Attendance Chart */}
+            <RadialGauge
+              label="Attendance"
+              percentage={95}
+              strokeColor="#E64A85"
+            />
+
+            {/* Homework Chart */}
+            <RadialGauge
+              label="Homework"
+              percentage={92}
+              strokeColor="#14B8A6"
+            />
+
+            {/* Rating Chart */}
+            <RadialGauge
+              label="Rating"
+              percentage={88}
+              strokeColor="#F59E0B"
+            />
+
+          </div>
+
+          <div className="pt-4 border-t border-[#D5CBC2]/50 dark:border-slate-800">
+            <button
+              onClick={() => onTabChange("progress")}
+              className="text-xs font-bold text-[#3C324A] dark:text-amber-400 hover:underline inline-flex items-center gap-2 cursor-pointer"
+              type="button"
+            >
+              <span>See more</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
         </div>
       </div>
 

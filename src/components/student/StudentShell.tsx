@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap,
@@ -20,8 +20,14 @@ import {
   X,
   LayoutDashboard,
   UserCheck,
-  ChevronRight
+  ChevronRight,
+  Home,
+  MoreVertical,
+  LogOut,
+  Bot,
+  User
 } from "lucide-react";
+import { UserButton, useClerk } from "@clerk/nextjs";
 import { StudentTab } from "@/lib/types/student-types";
 import { ThemeToggle } from "../ThemeToggle";
 import { CreditService } from "@/lib/services/credit-service";
@@ -38,250 +44,332 @@ export function StudentShell({ currentTab, onTabChange, children }: StudentShell
   const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // User state
+  const [currentUser, setCurrentUser] = useState<any>({ name: "Swati Kumari", email: "swati@student.ai4life.com" });
+
+  const pubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const isClerkEnabled = Boolean(
+    pubKey &&
+    pubKey.startsWith("pk_") &&
+    !pubKey.includes("your_")
+  );
+
+  let clerk: any = null;
+  try {
+    if (isClerkEnabled) {
+      clerk = useClerk();
+    }
+  } catch (err) {
+    // Fallback if Clerk context is inactive
+  }
+
+  useEffect(() => {
+    fetch("/api/auth")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+          if (data.user.credits !== undefined) setCredits(data.user.credits);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  const handleSearch = async (q: string) => {
+    setSearchQuery(q);
+    if (!q.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (data.success && data.results) {
+        setSearchResults(data.results);
+      }
+    } catch (err) {
+      console.error("Search API error:", err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleLogout = () => {
+    if (isClerkEnabled && clerk) {
+      clerk.signOut({ redirectUrl: "/" });
+    } else {
+      window.location.href = "/";
+    }
+  };
+
   const sidebarNavItems = [
     { tab: "dashboard" as StudentTab, label: "Dashboard", icon: LayoutDashboard },
-    { tab: "tutor" as StudentTab, label: "AI Tutor", icon: MessageSquare },
+    { tab: "challenge" as StudentTab, label: "AI Se Baazi", icon: Zap, badge: "Flagship" },
+    { tab: "tutor" as StudentTab, label: "AI Tutor", icon: Bot },
+    { tab: "ask-notes" as StudentTab, label: "Ask From Materials", icon: Database },
     { tab: "materials" as StudentTab, label: "My Materials", icon: FileText },
-    { tab: "ask-notes" as StudentTab, label: "Ask from Notes", icon: Database },
     { tab: "quiz-lab" as StudentTab, label: "Quiz Lab", icon: Sparkles },
-    { tab: "challenge" as StudentTab, label: "AI Se Baazi", icon: Zap, badge: "Signature" },
-    { tab: "progress" as StudentTab, label: "Progress", icon: BarChart2 },
     { tab: "planner" as StudentTab, label: "Study Planner", icon: Calendar },
+    { tab: "progress" as StudentTab, label: "Progress", icon: BarChart2 },
     { tab: "saved" as StudentTab, label: "Saved Notes", icon: Bookmark },
-    { tab: "memory" as StudentTab, label: "Mem0 Memory", icon: Brain },
-    { tab: "research" as StudentTab, label: "Tavily Research", icon: Globe },
+    { tab: "memory" as StudentTab, label: "AI Memory", icon: Brain },
   ];
 
-  const handleDeductCredits = (cost: number = 10): boolean => {
-    const res = CreditService.deductCredits(cost);
-    setCredits(res.remainingCredits);
-    if (!res.success) {
-      setIsUpgradeOpen(true);
-    }
-    return res.success;
-  };
-
-  const handleUpgradeSuccess = (added: number) => {
-    setCredits(CreditService.getCredits());
-  };
-
   return (
-    <div className="min-h-screen bg-[#F4F3EE] dark:bg-[#080B12] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
+    <div className="min-h-screen bg-[#E5DFC5]/40 dark:bg-[#080B12] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors p-2 sm:p-4 md:p-6">
       
-      {/* Top Header Bar */}
-      <header className="sticky top-0 z-40 border-b border-slate-200/80 dark:border-slate-800/80 bg-[#F4F3EE]/90 dark:bg-[#080B12]/90 backdrop-blur-md px-4 sm:px-6 py-3 flex items-center justify-between">
+      {/* Outer Shell Card Container matching reference screenshot */}
+      <div className="max-w-7xl w-full mx-auto bg-[#EFEAE6] dark:bg-[#0E131F] rounded-[36px] border border-[#E2DAD3] dark:border-slate-800/80 shadow-2xl overflow-hidden flex flex-col min-h-[92vh]">
         
-        {/* Left Brand Badge */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="p-2 rounded-xl bg-slate-200/60 dark:bg-slate-900 md:hidden"
-            type="button"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-
-          <a href="/" className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-[#3157D5] dark:bg-[#4F8CFF] text-white font-black">
-              <Zap className="w-4 h-4 fill-current" />
-            </div>
-            <div className="hidden sm:block">
-              <span className="text-sm font-black text-slate-900 dark:text-white font-heading">AI4Life</span>
-              <span className="text-[10px] font-bold text-[#3157D5] dark:text-[#4F8CFF] block -mt-1">Student Workspace</span>
-            </div>
-          </a>
-        </div>
-
-        {/* Center Search Bar (Desktop) */}
-        <div className="hidden md:flex items-center gap-2 max-w-md w-full px-4 py-2 rounded-2xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 text-xs text-slate-500">
-          <Search className="w-4 h-4" />
-          <input
-            type="text"
-            placeholder="Search study materials, quiz topics, or AI answers..."
-            className="w-full bg-transparent border-none text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400"
-          />
-        </div>
-
-        {/* Right Action Widgets */}
-        <div className="flex items-center gap-3">
+        {/* Top Header Bar */}
+        <header className="border-b border-[#E2DAD3]/70 dark:border-slate-800/80 bg-[#EFEAE6]/90 dark:bg-[#0E131F]/90 backdrop-blur-md px-6 py-4 flex items-center justify-between gap-4 relative z-30">
           
-          {/* Credit Indicator */}
-          <button
-            onClick={() => setIsUpgradeOpen(true)}
-            className="px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-extrabold text-xs flex items-center gap-1.5 hover:bg-amber-500/20 transition-colors"
-            type="button"
-          >
-            <Zap className="w-3.5 h-3.5 fill-current animate-pulse" />
-            <span>{credits} Credits</span>
-          </button>
+          {/* Mobile Menu Trigger & Greeting */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-2.5 rounded-2xl bg-[#DFD7D0] dark:bg-slate-900 md:hidden text-slate-700 dark:text-slate-200 cursor-pointer"
+              type="button"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
 
-          {/* Theme Toggle */}
-          <ThemeToggle />
-
-          {/* User Profile Pill */}
-          <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
-              S
-            </div>
-            <div className="hidden lg:block text-left">
-              <span className="text-xs font-bold text-slate-900 dark:text-white block line-clamp-1">Swati Kumari</span>
-              <span className="text-[10px] text-slate-500 font-medium block -mt-0.5">Plus Student</span>
+            <div>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-[#3C324A] dark:text-white tracking-wider font-heading uppercase">
+                HELLO, {currentUser?.name ? currentUser.name.split(" ")[0].toUpperCase() : "SWATI"}!
+              </h1>
             </div>
           </div>
 
-        </div>
-      </header>
-
-      {/* Main Layout Container */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 gap-6">
-        
-        {/* Desktop Left Sidebar */}
-        <aside className="hidden md:block w-64 shrink-0 space-y-6">
-          <div className="p-4 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-1.5 shadow-sm">
-            <div className="text-[10px] font-extrabold uppercase text-slate-400 px-3 py-1 tracking-wider">
-              Workspace Navigation
+          {/* Center Pill Search Bar */}
+          <div className="hidden md:flex flex-col relative max-w-sm w-full">
+            <div className="flex items-center gap-2 w-full px-4 py-2 rounded-full bg-[#DFD7D0]/60 dark:bg-[#161D2A] border border-[#D5CBC2] dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
+              <Search className="w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                placeholder="Search study materials, quiz topics, or AI..."
+                className="w-full bg-transparent border-none text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 font-medium"
+              />
             </div>
 
-            {sidebarNavItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = currentTab === item.tab;
-              return (
-                <button
-                  key={item.tab}
-                  onClick={() => onTabChange(item.tab)}
-                  className={`w-full px-3.5 py-2.5 rounded-2xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-[#3157D5] dark:bg-[#4F8CFF] text-white shadow-md"
-                      : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900"
-                  }`}
-                  type="button"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Icon className="w-4 h-4" />
-                    <span>{item.label}</span>
-                  </div>
-
-                  {item.badge && (
-                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${isActive ? "bg-white text-blue-600" : "bg-amber-500/20 text-amber-600 dark:text-amber-400"}`}>
-                      {item.badge}
+            {/* Live Search Overlay Results */}
+            {searchResults.length > 0 && (
+              <div className="absolute top-12 left-0 right-0 p-3 rounded-2xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 shadow-2xl space-y-2 z-50">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block px-2">Search Results</span>
+                {searchResults.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      onTabChange(item.tab as StudentTab);
+                      setSearchQuery("");
+                      setSearchResults([]);
+                    }}
+                    className="w-full text-left p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-between transition-colors cursor-pointer"
+                    type="button"
+                  >
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white">{item.title}</h4>
+                      <p className="text-[10px] text-slate-500 line-clamp-1">{item.snippet}</p>
+                    </div>
+                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                      {item.type}
                     </span>
-                  )}
-                </button>
-              );
-            })}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Quick Upgrade Box */}
-          <div className="p-4 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white space-y-3 shadow-lg">
-            <div className="flex items-center gap-2 font-bold text-xs">
-              <Sparkles className="w-4 h-4 text-amber-300" />
-              <span>Unlimited RAG & Quizzes</span>
-            </div>
-            <p className="text-[11px] text-blue-100 leading-relaxed">
-              Upgrade to Pro for 10,000 Credits, priority vector search, and Tavily web research.
-            </p>
+          {/* Right Header Controls */}
+          <div className="flex items-center gap-3">
+            
+            {/* Credit Badge */}
             <button
               onClick={() => setIsUpgradeOpen(true)}
-              className="w-full py-2 rounded-xl bg-white text-blue-600 font-extrabold text-xs shadow-xs hover:bg-blue-50 transition-colors"
+              className="px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 font-extrabold text-xs flex items-center gap-1.5 hover:bg-amber-500/20 transition-colors cursor-pointer"
               type="button"
             >
-              Upgrade to Pro
+              <Zap className="w-3.5 h-3.5 fill-current animate-pulse text-amber-500" />
+              <span>{credits} Credits</span>
             </button>
-          </div>
-        </aside>
 
-        {/* Mobile Slide-out Drawer */}
-        <AnimatePresence>
-          {isMobileMenuOpen && (
-            <div className="fixed inset-0 z-50 md:hidden flex">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
-              />
-              <motion.div
-                initial={{ x: "-100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "-100%" }}
-                className="relative w-72 max-w-full bg-white dark:bg-[#111722] p-6 space-y-4 shadow-2xl z-10 overflow-y-auto"
-              >
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
-                  <span className="font-black text-slate-900 dark:text-white font-heading">Student Workspace</span>
-                  <button onClick={() => setIsMobileMenuOpen(false)} type="button">
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="space-y-1">
-                  {sidebarNavItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = currentTab === item.tab;
-                    return (
-                      <button
-                        key={item.tab}
-                        onClick={() => {
-                          onTabChange(item.tab);
-                          setIsMobileMenuOpen(false);
-                        }}
-                        className={`w-full px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-between ${
-                          isActive ? "bg-[#3157D5] text-white" : "text-slate-700 dark:text-slate-300"
-                        }`}
-                        type="button"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Icon className="w-4 h-4" />
-                          <span>{item.label}</span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </motion.div>
+            {/* Notification Bell */}
+            <div className="relative p-2 rounded-full bg-[#DFD7D0]/60 dark:bg-[#161D2A] text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-[#D5CBC2]">
+              <Bell className="w-4 h-4" />
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500" />
             </div>
-          )}
-        </AnimatePresence>
 
-        {/* Main Workspace Content Area */}
-        <main className="flex-1 min-w-0">
-          {children}
-        </main>
+            {/* Theme Toggle */}
+            <ThemeToggle />
 
-      </div>
+            {/* Clerk User Button Profile Control */}
+            {isClerkEnabled && (
+              <div className="flex items-center">
+                <UserButton />
+              </div>
+            )}
 
-      {/* Mobile Bottom Navigation */}
-      <div className="md:hidden sticky bottom-0 z-40 border-t border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#111722]/90 backdrop-blur-md px-2 py-2 flex items-center justify-around">
-        {[
-          { tab: "dashboard" as StudentTab, label: "Home", icon: LayoutDashboard },
-          { tab: "tutor" as StudentTab, label: "Tutor", icon: MessageSquare },
-          { tab: "ask-notes" as StudentTab, label: "Notes", icon: Database },
-          { tab: "quiz-lab" as StudentTab, label: "Quiz", icon: Sparkles },
-          { tab: "challenge" as StudentTab, label: "Baazi", icon: Zap },
-        ].map((item) => {
-          const Icon = item.icon;
-          const isActive = currentTab === item.tab;
-          return (
-            <button
-              key={item.tab}
-              onClick={() => onTabChange(item.tab)}
-              className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl text-[10px] font-bold ${
-                isActive ? "text-[#3157D5] dark:text-[#4F8CFF]" : "text-slate-500"
-              }`}
-              type="button"
-            >
-              <Icon className="w-4 h-4" />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
+          </div>
+        </header>
+
+        {/* Main Workspace Layout (Sidebar + Content) */}
+        <div className="flex-1 flex flex-col md:flex-row min-h-0">
+          
+          {/* Left Sidebar (Desktop) */}
+          <aside className="hidden md:flex w-64 shrink-0 bg-[#DFD7D0]/50 dark:bg-[#121824] border-r border-[#E2DAD3] dark:border-slate-800/80 p-5 flex-col justify-between space-y-6">
+            
+            <div className="space-y-6">
+              
+              {/* Logo / App Name */}
+              <div className="flex items-center gap-3 px-2">
+                <span className="text-2xl font-black text-[#4A3E56] dark:text-white tracking-tight font-heading">
+                  AI4Life
+                </span>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                  Student
+                </span>
+              </div>
+
+              {/* Profile Card Pill */}
+              <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#EFEAE6]/80 dark:bg-[#1A2232] border border-[#D5CBC2]/60 dark:border-slate-800">
+                <div className="relative w-11 h-11 rounded-full overflow-hidden shrink-0 border-2 border-blue-500/80 shadow-xs bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-sm">
+                  {currentUser?.name ? currentUser.name.split(" ").map((n: string) => n[0]).join("") : "SK"}
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-xs font-black text-[#3C324A] dark:text-white truncate">
+                    {currentUser?.name || "Swati Kumari"}
+                  </h2>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                    Computer Science & AI
+                  </p>
+                </div>
+              </div>
+
+              {/* Sidebar Navigation Items */}
+              <nav className="space-y-1.5">
+                {sidebarNavItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = currentTab === item.tab;
+                  return (
+                    <button
+                      key={item.tab}
+                      onClick={() => onTabChange(item.tab)}
+                      className={`w-full px-4 py-2.5 rounded-2xl text-xs font-extrabold flex items-center justify-between transition-all cursor-pointer ${
+                        isActive
+                          ? "bg-[#EFEAE6] dark:bg-[#1E2738] text-[#3C324A] dark:text-white shadow-sm border border-[#D5CBC2] dark:border-slate-700"
+                          : "text-slate-600 dark:text-slate-400 hover:bg-[#EAE4DE] dark:hover:bg-[#161D2A] hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                      type="button"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`p-1 rounded-lg ${isActive ? "bg-amber-400/20 text-amber-700 dark:text-amber-300" : "text-slate-500"}`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <span>{item.label}</span>
+                      </div>
+
+                      {item.badge && (
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${isActive ? "bg-[#3C324A] text-white" : "bg-amber-500/20 text-amber-700 dark:text-amber-400"}`}>
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+
+            {/* Bottom Log out Button */}
+            <div className="pt-4 border-t border-[#D5CBC2]/60 dark:border-slate-800">
+              <button
+                onClick={handleLogout}
+                className="w-full px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 transition-colors flex items-center gap-3 cursor-pointer"
+                type="button"
+              >
+                <div className="p-1 rounded-lg bg-rose-500/10 text-rose-600">
+                  <LogOut className="w-4 h-4" />
+                </div>
+                <span>Log out</span>
+              </button>
+            </div>
+
+          </aside>
+
+          {/* Mobile Drawer Navigation */}
+          <AnimatePresence>
+            {isMobileMenuOpen && (
+              <div className="fixed inset-0 z-50 md:hidden flex">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
+                />
+                <motion.div
+                  initial={{ x: "-100%" }}
+                  animate={{ x: 0 }}
+                  exit={{ x: "-100%" }}
+                  className="relative w-72 max-w-full bg-[#EFEAE6] dark:bg-[#111722] p-6 space-y-4 shadow-2xl z-10 overflow-y-auto"
+                >
+                  <div className="flex items-center justify-between border-b border-[#D5CBC2] dark:border-slate-800 pb-4">
+                    <span className="font-black text-[#3C324A] dark:text-white font-heading text-lg">AI4Life</span>
+                    <button onClick={() => setIsMobileMenuOpen(false)} type="button">
+                      <X className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {sidebarNavItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = currentTab === item.tab;
+                      return (
+                        <button
+                          key={item.tab}
+                          onClick={() => {
+                            onTabChange(item.tab);
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className={`w-full px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-between ${
+                            isActive ? "bg-[#3C324A] text-white" : "text-slate-700 dark:text-slate-300"
+                          }`}
+                          type="button"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Icon className="w-4 h-4" />
+                            <span>{item.label}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* Main Content Area */}
+          <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+            {children}
+          </main>
+
+        </div>
+
       </div>
 
       {/* Upgrade Plan Modal */}
       <UpgradeModal
         isOpen={isUpgradeOpen}
         onClose={() => setIsUpgradeOpen(false)}
-        onSuccess={handleUpgradeSuccess}
+        onSuccess={(added) => setCredits((prev) => prev + added)}
       />
 
     </div>

@@ -19,14 +19,14 @@ export function FooterSimple() {
                 AI4Life
               </span>
               <p className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">
-                One AI core. Three ways to live.
+                AI that helps you learn, understand and improve.
               </p>
             </div>
           </div>
 
           {/* Minimal Navigation Links */}
           <div className="flex flex-wrap items-center gap-6 text-xs font-bold text-slate-700 dark:text-slate-300">
-            <a href="#workspaces" className="hover:text-[#3157D5] dark:hover:text-[#4F8CFF] transition-colors">Workspaces</a>
+            <a href="/student" className="hover:text-[#3157D5] dark:hover:text-[#4F8CFF] transition-colors">Student Workspace</a>
             <a href="#how-it-works" className="hover:text-[#3157D5] dark:hover:text-[#4F8CFF] transition-colors">How it works</a>
             <a href="#pricing" className="hover:text-[#3157D5] dark:hover:text-[#4F8CFF] transition-colors">Pricing</a>
             <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="hover:text-[#3157D5] dark:hover:text-[#4F8CFF] transition-colors flex items-center gap-1"><Code2 className="w-3.5 h-3.5" /> GitHub</a>

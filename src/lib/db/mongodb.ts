@@ -25,3 +25,9 @@ export async function getMongoClient() {
     return null;
   }
 }
+
+export async function getDb(dbName: string = "ai4life") {
+  const client = await getMongoClient();
+  if (!client) return null;
+  return client.db(dbName);
+}

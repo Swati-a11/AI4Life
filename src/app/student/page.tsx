@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { StudentTab } from "@/lib/types/student-types";
 import { StudentShell } from "@/components/student/StudentShell";
 import { DashboardView } from "@/components/student/DashboardView";
@@ -17,8 +18,19 @@ import { TavilyResearchView } from "@/components/student/TavilyResearchView";
 import { CreditService } from "@/lib/services/credit-service";
 
 export default function StudentWorkspacePage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<StudentTab>("dashboard");
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+
+  useEffect(() => {
+    // Redirect to landing page if user refreshes the browser while on student workspace
+    if (typeof window !== "undefined") {
+      const navEntries = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
+      if (navEntries.length > 0 && navEntries[0].type === "reload") {
+        router.replace("/");
+      }
+    }
+  }, [router]);
 
   const handleDeductCredits = (cost: number = 10): boolean => {
     const res = CreditService.deductCredits(cost);

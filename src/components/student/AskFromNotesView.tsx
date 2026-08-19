@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText,
@@ -12,80 +12,126 @@ import {
   CheckCircle2,
   X,
   Send,
-  Upload
+  Upload,
+  Eye,
+  HelpCircle,
+  Video
 } from "lucide-react";
-import { QdrantRAGService } from "@/lib/services/rag-service";
+import { StudyMaterial } from "@/lib/types/student-types";
 
 interface AskFromNotesViewProps {
   onDeductCredits: (cost: number) => boolean;
 }
 
 export function AskFromNotesView({ onDeductCredits }: AskFromNotesViewProps) {
-  const [query, setQuery] = useState("");
-  const [selectedDoc, setSelectedDoc] = useState("all");
-  const [isSearching, setIsSearching] = useState(false);
-  const [activeChunk, setActiveChunk] = useState<{ title: string; chunkText: string; page?: number } | null>(null);
+  const [materials, setMaterials] = useState<StudyMaterial[]>([]);
+  const [isLoadingMaterials, setIsLoadingMaterials] = useState(true);
+
+  // Active Selected Material State
+  const [selectedMaterial, setSelectedMaterial] = useState<{
+    id: string;
+    title: string;
+    sourceType: string;
+    sizeMb: number;
+    extractedText: string;
+    chunks?: any[];
+  } | null>(null);
+
+  const [materialQuestion, setMaterialQuestion] = useState("");
+  const [isAskingMaterial, setIsAskingMaterial] = useState(false);
 
   const [ragResult, setRagResult] = useState<{
     answerText: string;
+    isGrounded: boolean;
     citations: { title: string; chunkText: string; page?: number }[];
-  } | null>({
-    answerText: "Based on your uploaded document Data_Structures_Chapter3.pdf, binary search requires the input array to be pre-sorted. Pointers `left` and `right` calculate `mid = left + (right - left) / 2` to prevent overflow.",
-    citations: [
-      {
-        title: "Source: Data_Structures_Chapter3.pdf",
-        chunkText: "...Section 3.2: Logarithmic binary search operates by taking the midpoint mid = left + (right - left) / 2 and comparing against the target key...",
-        page: 14
-      },
-      {
-        title: "Source: Algorithms_Lecture_Notes.docx",
-        chunkText: "...Complexity bounds: Worst-case number of operations required for array size N is floor(log2 N) + 1...",
-        page: 5
+  } | null>(null);
+
+  useEffect(() => {
+    setIsLoadingMaterials(true);
+    fetch("/api/upload")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.documents) {
+          const mapped: StudyMaterial[] = data.documents.map((d: any) => ({
+            id: d.id,
+            title: d.title,
+            subject: d.sourceType === "youtube" ? "Operating Systems" : "Computer Science",
+            fileType: d.sourceType || "pdf",
+            sizeMb: d.sizeMb || 1.2,
+            uploadedAt: d.uploadedAt || "Recently",
+            status: d.processingStatus === "ready" ? "Ready" : "Processing",
+            chunksCount: d.chunks ? d.chunks.length : 0,
+            qdrantCollectionRef: `qdrant_${d.id}`
+          }));
+          setMaterials(mapped);
+
+          // Auto-select first material if available
+          if (mapped.length > 0) {
+            handleSelectMaterial(mapped[0].id);
+          }
+        }
+      })
+      .catch(console.error)
+      .finally(() => setIsLoadingMaterials(false));
+  }, []);
+
+  const handleSelectMaterial = async (id: string) => {
+    try {
+      const res = await fetch(`/api/materials/${id}`);
+      const data = await res.json();
+      if (data.success && data.material) {
+        setSelectedMaterial(data.material);
+        setRagResult(null);
+      } else {
+        alert("Couldn't extract readable content from this source.");
       }
-    ]
-  });
+    } catch (err) {
+      console.error("Select material error:", err);
+      alert("Couldn't retrieve material content.");
+    }
+  };
 
-  const [isGrounded, setIsGrounded] = useState(true);
+  const handleAskMaterialQuestion = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!materialQuestion.trim() || !selectedMaterial) return;
 
-  const handleRagSearch = async () => {
-    if (!query.trim()) return;
     const hasCredits = onDeductCredits(10);
     if (!hasCredits) return;
 
-    setIsSearching(true);
+    setIsAskingMaterial(true);
     try {
       const res = await fetch("/api/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          query,
-          documentId: selectedDoc === "all" ? undefined : selectedDoc
+          query: materialQuestion,
+          documentId: selectedMaterial.id
         })
       });
 
       const data = await res.json();
       if (data.success) {
-        setIsGrounded(Boolean(data.isGrounded));
         setRagResult({
-          answerText: data.responseText || "No response received.",
+          answerText: data.responseText || "No response generated.",
+          isGrounded: Boolean(data.isGrounded),
           citations: data.citations || []
         });
       } else {
-        setIsGrounded(false);
         setRagResult({
-          answerText: "I couldn't find this in your uploaded material.",
+          answerText: "I couldn't find that information in this material. I can still explain it using general knowledge if you'd like.",
+          isGrounded: false,
           citations: []
         });
       }
     } catch (err) {
-      console.error("Ask From Notes API error:", err);
-      setIsGrounded(false);
+      console.error("Ask material error:", err);
       setRagResult({
-        answerText: "Couldn't query notes at this time. Please try again.",
+        answerText: "Couldn't query material at this time. Please try again.",
+        isGrounded: false,
         citations: []
       });
     } finally {
-      setIsSearching(false);
+      setIsAskingMaterial(false);
     }
   };
 
@@ -96,138 +142,172 @@ export function AskFromNotesView({ onDeductCredits }: AskFromNotesViewProps) {
       <div className="p-6 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 text-[#0D9488] dark:text-[#38D9C5] text-xs font-bold border border-teal-500/20">
           <Database className="w-3.5 h-3.5" />
-          Qdrant RAG Notes Search
+          Ask From Materials
         </div>
         <h2 className="text-2xl font-black text-slate-900 dark:text-white font-heading">
-          Ask From Your Uploaded Notes
+          Ask From Your Uploaded Materials
         </h2>
         <p className="text-xs text-slate-600 dark:text-slate-300">
-          Query your PDFs & DOCX files directly. AI groundings prioritize your exact study material.
+          Query your PDFs, DOCX, TXT, YouTube transcripts, and study materials directly. AI answers prioritize your selected material.
         </p>
       </div>
 
-      {/* Query Bar */}
-      <div className="p-4 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-4">
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <select
-            value={selectedDoc}
-            onChange={(e) => setSelectedDoc(e.target.value)}
-            className="w-full sm:w-64 px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none"
-          >
-            <option value="all">All Uploaded Notes (4 Docs)</option>
-            <option value="ds">Data_Structures_Chapter3.pdf</option>
-            <option value="algo">Algorithms_Lecture_Notes.docx</option>
-            <option value="os">OS_Lecture_5.pdf</option>
-          </select>
-
-          <div className="flex-1 w-full flex items-center gap-2">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask a question from your study material..."
-              className="flex-1 px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
-            />
-            <button
-              onClick={handleRagSearch}
-              disabled={!query.trim() || isSearching}
-              className="px-6 py-3 rounded-2xl bg-[#0D9488] dark:bg-[#38D9C5] text-white dark:text-slate-950 font-bold text-xs hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-              type="button"
-            >
-              <Search className="w-4 h-4" />
-              <span>{isSearching ? "Searching..." : "Search Notes"}</span>
-            </button>
-          </div>
+      {/* Empty State when 0 uploads */}
+      {materials.length === 0 && !isLoadingMaterials ? (
+        <div className="p-12 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 text-center space-y-3">
+          <FileText className="w-8 h-8 text-teal-500 mx-auto" />
+          <h3 className="text-base font-bold text-slate-900 dark:text-white">You haven't added any material yet.</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            Upload your study material in My Materials to start asking questions grounded in your content.
+          </p>
         </div>
-      </div>
-
-      {/* RAG Answer & Source Citations Display */}
-      {ragResult && (
+      ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Answer Box */}
-          <div className="lg:col-span-8 p-6 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-              <span className="text-xs font-bold text-[#0D9488] dark:text-[#38D9C5] uppercase tracking-wider flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
-                Grounded AI Answer
-              </span>
-              <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold ${isGrounded ? "bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/30" : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"}`}>
-                {isGrounded ? "Answer based on your notes" : "Not found in notes"}
-              </span>
-            </div>
-
-            <div className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
-              {ragResult.answerText}
-            </div>
-          </div>
-
-          {/* Citations Sidebar */}
-          <div className="lg:col-span-4 p-6 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-4">
-            <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-              <Layers className="w-4 h-4 text-teal-500" />
-              Document Citations ({ragResult.citations.length})
+          
+          {/* Left: Materials Selector List (Col 4) */}
+          <div className="lg:col-span-4 space-y-3">
+            <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider px-1">
+              Select Source Material ({materials.length})
             </h3>
+            
+            <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+              {materials.map((m) => {
+                const isSelected = selectedMaterial?.id === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => handleSelectMaterial(m.id)}
+                    className={`w-full text-left p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                      isSelected
+                        ? "bg-teal-500/10 border-teal-500 text-slate-900 dark:text-white shadow-xs"
+                        : "bg-white dark:bg-[#111722] border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                    }`}
+                    type="button"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`p-2.5 rounded-xl shrink-0 ${isSelected ? "bg-teal-500 text-white" : "bg-slate-100 dark:bg-slate-900 text-slate-500"}`}>
+                        {m.fileType === "youtube" ? <Video className="w-4 h-4 text-red-500" /> : <FileText className="w-4 h-4" />}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold truncate text-slate-900 dark:text-white">{m.title}</h4>
+                        <span className="text-[10px] text-slate-500 uppercase font-semibold">{m.fileType} • {m.sizeMb} MB</span>
+                      </div>
+                    </div>
 
-            <div className="space-y-3">
-              {ragResult.citations.map((cite, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveChunk(cite)}
-                  className="w-full text-left p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2 hover:border-teal-500 transition-colors group"
-                  type="button"
-                >
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white">
-                    <span className="truncate">{cite.title}</span>
-                    {cite.page && <span className="text-[10px] text-teal-600 dark:text-teal-400">P. {cite.page}</span>}
-                  </div>
-                  <p className="text-[11px] text-slate-500 line-clamp-2 italic font-mono">
-                    "{cite.chunkText}"
-                  </p>
-                  <div className="text-[10px] font-bold text-teal-600 dark:text-teal-400 group-hover:underline flex items-center gap-1">
-                    <span>Inspect chunk context</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </div>
-                </button>
-              ))}
+                    {isSelected && <CheckCircle2 className="w-4 h-4 text-teal-500 shrink-0" />}
+                  </button>
+                );
+              })}
             </div>
           </div>
+
+          {/* Right: Selected Material Reader & Dedicated Question Input Form (Col 8) */}
+          <div className="lg:col-span-8 space-y-6">
+            {selectedMaterial ? (
+              <div className="p-6 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-5">
+                
+                {/* Header Metadata */}
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
+                      {selectedMaterial.sourceType.toUpperCase()} SOURCE CONTENT
+                    </span>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-1">{selectedMaterial.title}</h3>
+                  </div>
+                  <span className="text-xs font-bold text-slate-500">{selectedMaterial.sizeMb} MB</span>
+                </div>
+
+                {/* Readable Extracted Content View */}
+                <div className="p-4 rounded-2xl bg-slate-950 text-slate-200 font-mono text-xs leading-relaxed max-h-60 overflow-y-auto border border-slate-800 space-y-2">
+                  <div className="text-[11px] text-slate-500 pb-2 border-b border-slate-800 font-sans">
+                    Extracted Text / Transcript Content
+                  </div>
+                  <div className="whitespace-pre-wrap">{selectedMaterial.extractedText}</div>
+                </div>
+
+                {/* Dedicated Question Input Area */}
+                <form onSubmit={handleAskMaterialQuestion} className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <label className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <HelpCircle className="w-4 h-4 text-teal-500" />
+                    <span>Ask AI about this material</span>
+                  </label>
+                  
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={materialQuestion}
+                      onChange={(e) => setMaterialQuestion(e.target.value)}
+                      placeholder={`Type your question about ${selectedMaterial.title}...`}
+                      className="flex-1 px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder:text-slate-500 focus:outline-none focus:border-teal-500"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!materialQuestion.trim() || isAskingMaterial}
+                      className="px-6 py-3 rounded-2xl bg-[#0D9488] dark:bg-[#38D9C5] text-white dark:text-slate-950 font-bold text-xs hover:opacity-90 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                    >
+                      <Send className="w-4 h-4" />
+                      <span>{isAskingMaterial ? "Asking AI..." : "Ask AI"}</span>
+                    </button>
+                  </div>
+                </form>
+
+                {/* RAG Source-Grounded Answer Result */}
+                {ragResult && (
+                  <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4" />
+                        Source-Grounded Response
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${ragResult.isGrounded ? "bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/30" : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"}`}>
+                          {ragResult.isGrounded ? "Grounded in selected source" : "Not found in material"}
+                        </span>
+                        <button
+                          onClick={async () => {
+                            if (!ragResult || !selectedMaterial) return;
+                            try {
+                              const res = await fetch("/api/notes", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  title: materialQuestion.substring(0, 40) || selectedMaterial.title,
+                                  content: ragResult.answerText,
+                                  sourceType: "material",
+                                  sourceName: selectedMaterial.title,
+                                  materialId: selectedMaterial.id
+                                })
+                              });
+                              const data = await res.json();
+                              if (data.success) alert("Note saved.");
+                            } catch (err) {
+                              console.error("Save note error:", err);
+                            }
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/30 text-[11px] font-bold hover:bg-teal-500/20 cursor-pointer flex items-center gap-1"
+                          type="button"
+                        >
+                          <span>Save Note</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap font-sans">
+                      {ragResult.answerText}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            ) : (
+              <div className="p-12 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 text-center text-slate-500 text-xs">
+                Select a material from the left to view its extracted content and ask questions.
+              </div>
+            )}
+          </div>
+
         </div>
       )}
-
-      {/* Chunk Inspector Modal */}
-      <AnimatePresence>
-        {activeChunk && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-2xl relative"
-            >
-              <button
-                onClick={() => setActiveChunk(null)}
-                className="absolute top-4 right-4 p-2 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-500"
-                type="button"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider">Vector Chunk Context</span>
-                <h4 className="text-base font-bold text-slate-900 dark:text-white">{activeChunk.title}</h4>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-950 text-slate-200 font-mono text-xs leading-relaxed border border-slate-800">
-                {activeChunk.chunkText}
-              </div>
-
-              <div className="text-[11px] text-slate-500">
-                Vector Embedding Similarity Score: <span className="font-bold text-emerald-500">0.942</span>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
     </div>
   );

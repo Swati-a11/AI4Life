@@ -36,7 +36,7 @@ export function SolutionSection() {
       id: "understand",
       title: "2. UNDERSTAND",
       subtitle: "Multi-Modal Reasoning",
-      desc: "MOVA parses complex terms, tables, and audio transcripts with accuracy.",
+      desc: "AI4Life parses complex terms, tables, and audio transcripts with accuracy.",
       icon: BrainCircuit,
       color: "text-sky-400"
     },
@@ -105,7 +105,7 @@ export function SolutionSection() {
           })}
         </div>
 
-        {/* Polished MOVA Product Dashboard Mockup */}
+        {/* Polished AI4Life Product Dashboard Mockup */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -198,7 +198,7 @@ export function SolutionSection() {
                     <div className="flex items-center justify-between border-b border-slate-700 pb-2">
                       <span className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5" />
-                        MOVA Understanding Complete
+                        AI4Life Understanding Complete
                       </span>
                       <span className="text-[10px] text-slate-400">15 pages processed in 0.4s</span>
                     </div>

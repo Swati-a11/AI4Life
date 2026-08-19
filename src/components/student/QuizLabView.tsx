@@ -1,54 +1,94 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, CheckCircle2, XCircle, RefreshCw, Trophy, ArrowRight, HelpCircle } from "lucide-react";
-import { QuizItem, QuizQuestion } from "@/lib/types/student-types";
-import { GeminiAIService } from "@/lib/services/ai-service";
+import { Sparkles, CheckCircle2, XCircle, RefreshCw, Trophy, ArrowRight, HelpCircle, FileText, Video } from "lucide-react";
+import { QuizItem, QuizQuestion, StudyMaterial } from "@/lib/types/student-types";
 
 interface QuizLabViewProps {
   onDeductCredits: (cost: number) => boolean;
 }
 
 export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
-  const [selectedSource, setSelectedSource] = useState("Data_Structures_Chapter3.pdf");
+  const [materials, setMaterials] = useState<StudyMaterial[]>([]);
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string>("");
+  const [isLoadingMaterials, setIsLoadingMaterials] = useState(true);
+
   const [difficulty, setDifficulty] = useState<"Easy" | "Medium" | "Hard">("Medium");
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeQuiz, setActiveQuiz] = useState<QuizItem | null>(null);
   const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizError, setQuizError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsLoadingMaterials(true);
+    fetch("/api/materials")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.materials) {
+          const mapped: StudyMaterial[] = data.materials.map((d: any) => ({
+            id: d.id,
+            title: d.title,
+            subject: d.sourceType === "youtube" ? "Operating Systems" : "Computer Science",
+            fileType: d.sourceType || "pdf",
+            sizeMb: d.sizeMb || 1.2,
+            uploadedAt: d.uploadedAt || "Recently",
+            status: d.processingStatus === "ready" ? "Ready" : "Processing",
+            chunksCount: d.chunks ? d.chunks.length : 0,
+            qdrantCollectionRef: `qdrant_${d.id}`
+          }));
+          setMaterials(mapped);
+
+          if (mapped.length > 0) {
+            setSelectedMaterialId(mapped[0].id);
+          }
+        }
+      })
+      .catch(console.error)
+      .finally(() => setIsLoadingMaterials(false));
+  }, []);
 
   const handleGenerateQuiz = async () => {
+    if (!selectedMaterialId && materials.length > 0) return;
     const hasCredits = onDeductCredits(15);
     if (!hasCredits) return;
+
+    const selectedMat = materials.find((m) => m.id === selectedMaterialId);
+    const targetTitle = selectedMat ? selectedMat.title : "Study Material";
 
     setIsGenerating(true);
     setQuizSubmitted(false);
     setUserAnswers({});
+    setQuizError(null);
 
     try {
       const res = await fetch("/api/quiz", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          topic: selectedSource,
-          questionCount: 4,
+          documentId: selectedMaterialId,
+          topic: targetTitle,
+          questionCount: 5,
           difficulty
         })
       });
 
       const data = await res.json();
-      if (data.success && data.questions) {
+      if (data.success && data.questions && data.questions.length > 0) {
         setActiveQuiz({
           id: `quiz_${Date.now()}`,
-          title: `Quiz on ${selectedSource}`,
-          subject: "Computer Science",
+          title: `Quiz on ${targetTitle}`,
+          subject: selectedMat?.subject || "Computer Science",
           difficulty,
           questions: data.questions
         });
+      } else {
+        setQuizError(data.error || "There's not enough readable content in this material to generate a reliable quiz.");
       }
     } catch (err) {
       console.error("Quiz API Error:", err);
+      setQuizError("Couldn't generate quiz. Please try again.");
     } finally {
       setIsGenerating(false);
     }
@@ -77,7 +117,7 @@ export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
         body: JSON.stringify({
           recordAttempt: true,
           attemptData: {
-            topic: selectedSource,
+            topic: activeQuiz.title,
             score: correctCount,
             total: activeQuiz.questions.length
           }
@@ -96,65 +136,85 @@ export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <h2 className="text-2xl font-black text-slate-900 dark:text-white font-heading">
-              AI Quiz Lab
+              Fuse Lab (Quiz Generator)
             </h2>
             <p className="text-xs text-slate-600 dark:text-slate-300">
-              Generate custom MCQs and practice questions directly from your notes.
+              Generate custom MCQs and practice questions directly from your uploaded materials.
             </p>
           </div>
 
-          <button
-            onClick={handleGenerateQuiz}
-            disabled={isGenerating}
-            className="px-6 py-3 rounded-2xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 shadow-md"
-            type="button"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>{isGenerating ? "Generating Quiz..." : "Generate AI Quiz"}</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-          <div>
-            <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">Source Material</label>
-            <select
-              value={selectedSource}
-              onChange={(e) => setSelectedSource(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-200"
+          {materials.length > 0 && (
+            <button
+              onClick={handleGenerateQuiz}
+              disabled={isGenerating || !selectedMaterialId}
+              className="px-6 py-3 rounded-2xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 shadow-md cursor-pointer"
+              type="button"
             >
-              <option value="Data_Structures_Chapter3.pdf">Data_Structures_Chapter3.pdf</option>
-              <option value="Algorithms_Lecture_Notes.docx">Algorithms_Lecture_Notes.docx</option>
-              <option value="OS_Lecture_5.pdf">OS_Lecture_5.pdf</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">Difficulty</label>
-            <div className="flex items-center gap-2">
-              {(["Easy", "Medium", "Hard"] as const).map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setDifficulty(d)}
-                  className={`flex-1 py-2 rounded-xl text-xs font-bold ${
-                    difficulty === d
-                      ? "bg-purple-600 text-white"
-                      : "bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800"
-                  }`}
-                  type="button"
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">Question Count</label>
-            <div className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-200">
-              4 Questions (MCQ)
-            </div>
-          </div>
+              <Sparkles className="w-4 h-4" />
+              <span>{isGenerating ? "Generating Quiz..." : "Generate AI Quiz"}</span>
+            </button>
+          )}
         </div>
+
+        {materials.length === 0 && !isLoadingMaterials ? (
+          <div className="p-8 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center space-y-2">
+            <FileText className="w-8 h-8 text-purple-500 mx-auto" />
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">You haven't added any material yet.</h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              Upload your first study material in My Materials to use Fuse Lab for generating quizzes.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+            <div>
+              <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">Source Material</label>
+              <select
+                value={selectedMaterialId}
+                onChange={(e) => setSelectedMaterialId(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-200"
+              >
+                {materials.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.title} ({m.fileType.toUpperCase()})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">Difficulty</label>
+              <div className="flex items-center gap-2">
+                {(["Easy", "Medium", "Hard"] as const).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setDifficulty(d)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
+                      difficulty === d
+                        ? "bg-purple-600 text-white"
+                        : "bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800"
+                    }`}
+                    type="button"
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">Question Count</label>
+              <div className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-200">
+                5 Questions (MCQ)
+              </div>
+            </div>
+          </div>
+        )}
+
+        {quizError && (
+          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-bold text-amber-600 dark:text-amber-400">
+            {quizError}
+          </div>
+        )}
       </div>
 
       {/* Active Quiz Area */}
@@ -163,7 +223,7 @@ export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
           <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
             <div>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white font-heading">{activeQuiz.title}</h3>
-              <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold">{activeQuiz.difficulty} Difficulty • 4 Questions</span>
+              <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold">{activeQuiz.difficulty} Difficulty • {activeQuiz.questions.length} Questions</span>
             </div>
 
             {quizSubmitted && (
@@ -201,7 +261,7 @@ export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
                       <button
                         key={optIdx}
                         onClick={() => handleSelectOption(qIdx, optIdx)}
-                        className={`w-full text-left p-3.5 rounded-xl border text-xs flex items-center justify-between transition-all ${btnStyle}`}
+                        className={`w-full text-left p-3.5 rounded-xl border text-xs flex items-center justify-between transition-all cursor-pointer ${btnStyle}`}
                         type="button"
                       >
                         <span>{opt}</span>
@@ -224,7 +284,7 @@ export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
           {!quizSubmitted ? (
             <button
               onClick={handleSubmitQuiz}
-              className="w-full py-4 rounded-2xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 shadow-md transition-colors"
+              className="w-full py-4 rounded-2xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 shadow-md transition-colors cursor-pointer"
               type="button"
             >
               Submit Quiz Answers
@@ -232,7 +292,7 @@ export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
           ) : (
             <button
               onClick={handleGenerateQuiz}
-              className="w-full py-4 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-bold text-xs hover:opacity-90 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-4 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-bold text-xs hover:opacity-90 transition-colors flex items-center justify-center gap-2 cursor-pointer"
               type="button"
             >
               <RefreshCw className="w-4 h-4" />

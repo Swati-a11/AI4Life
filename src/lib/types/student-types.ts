@@ -14,12 +14,8 @@ export type StudentTab =
 
 export type AITutorMode =
   | "Explain"
-  | "Summarize"
-  | "Solve"
   | "Quiz Me"
-  | "Give Examples"
-  | "Simplify"
-  | "Deep Dive";
+  | "Give Example";
 
 export interface StudentProfile {
   clerkUserId: string;
@@ -40,7 +36,7 @@ export interface StudyMaterial {
   id: string;
   title: string;
   subject: string;
-  fileType: "pdf" | "docx" | "note";
+  fileType: "pdf" | "docx" | "note" | "txt" | "mp4" | "svg" | "youtube";
   sizeMb: number;
   uploadedAt: string;
   status: "Uploading" | "Processing" | "Ready" | "Failed";

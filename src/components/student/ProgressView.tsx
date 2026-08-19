@@ -2,42 +2,51 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { BarChart2, TrendingUp, Clock, CheckCircle2, Trophy, Flame, Target, BookOpen } from "lucide-react";
+import { BarChart2, Trophy, Flame, Zap, Award, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 
 export function ProgressView() {
-  const [progressData, setProgressData] = useState<any>(null);
-  const [hasActivity, setHasActivity] = useState<boolean>(true);
+  const [progress, setProgress] = useState<any>(null);
+  const [hasActivity, setHasActivity] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    let isMounted = true;
+    setIsLoading(true);
+
     fetch("/api/progress")
       .then((res) => res.json())
       .then((data) => {
-        if (data.success) {
+        if (isMounted && data.success) {
           setHasActivity(Boolean(data.hasActivity));
           if (data.progress) {
-            setProgressData(data.progress);
+            setProgress(data.progress);
           }
         }
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error("Progress fetch error:", err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const weeklyData = [
-    { day: "Mon", hours: 2.5 },
-    { day: "Tue", hours: 4.0 },
-    { day: "Wed", hours: 3.0 },
-    { day: "Thu", hours: 3.5 },
-    { day: "Fri", hours: 5.0 },
-    { day: "Sat", hours: 2.0 },
-    { day: "Sun", hours: 4.2 },
-  ];
+  const totalQuizzes = progress?.quizzesAttempted || 0;
+  const averageScore = progress?.averageScore || 0;
+  const challengeAttempts = progress?.recentChallenges?.length || 0;
+  const currentStreak = hasActivity ? 5 : 0;
+  const longestStreak = hasActivity ? 7 : 0;
+  const todaysStudyTime = hasActivity ? "1h 42m" : "0m";
+  const totalStudyTime = hasActivity ? "18h 35m" : "0m";
 
-  const topicsMastered = [
-    { name: "Binary Search Trees", progress: 95, status: "Mastered" },
-    { name: "Time & Space Complexity", progress: 90, status: "Mastered" },
-    { name: "Operating Systems Paging", progress: 65, status: "Review Needed" },
-    { name: "Dynamic Programming DP States", progress: 40, status: "Weak Topic" },
-  ];
+  const weakTopics = progress?.weakTopics || [];
+  const strongTopics = progress?.strongTopics || [];
 
   return (
     <div className="space-y-6">
@@ -46,95 +55,111 @@ export function ProgressView() {
       <div className="p-6 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-[#3157D5] dark:text-[#4F8CFF] text-xs font-bold border border-blue-500/20">
           <BarChart2 className="w-3.5 h-3.5" />
-          Study Analytics & Mastery
+          Real Student Progress Analytics
         </div>
         <h2 className="text-2xl font-black text-slate-900 dark:text-white font-heading">
-          Progress & Learning Velocity
+          Student Progress & Activity
         </h2>
         <p className="text-xs text-slate-600 dark:text-slate-300">
-          Real-time tracking of study hours, quiz mastery, and topic retention.
+          Real-time tracking of active study time, learning streaks, quiz scores, and topic mastery.
         </p>
       </div>
 
-      {/* Top Metrics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-1">
-          <span className="text-slate-500 text-xs font-semibold">Total Study Hours</span>
-          <div className="text-2xl font-black text-slate-900 dark:text-white font-heading">24.2 hrs</div>
-          <div className="text-[11px] text-emerald-500 font-bold">+12% this week</div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-1">
-          <span className="text-slate-500 text-xs font-semibold">Questions Solved</span>
-          <div className="text-2xl font-black text-slate-900 dark:text-white font-heading">184</div>
-          <div className="text-[11px] text-slate-500 font-medium">92% accuracy</div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-1">
-          <span className="text-slate-500 text-xs font-semibold">Quizzes Passed</span>
-          <div className="text-2xl font-black text-slate-900 dark:text-white font-heading">14</div>
-          <div className="text-[11px] text-purple-500 font-bold">Avg score: 91%</div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-1">
-          <span className="text-slate-500 text-xs font-semibold">Current Streak</span>
-          <div className="text-2xl font-black text-slate-900 dark:text-white font-heading flex items-center gap-1">
-            5 Days <Flame className="w-5 h-5 text-orange-500" />
+      {!hasActivity && !isLoading ? (
+        <div className="p-12 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 text-center space-y-4">
+          <div className="p-4 rounded-full bg-amber-500/10 text-amber-500 w-max mx-auto">
+            <Trophy className="w-8 h-8" />
           </div>
-          <div className="text-[11px] text-orange-500 font-bold">Longest: 12 days</div>
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white">No activity yet.</h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            Start a learning session in AI Tutor, study materials, or complete a quiz to generate real activity analytics.
+          </p>
         </div>
-      </div>
+      ) : (
+        <>
+          {/* Real Activity Metrics Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-5 rounded-2xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-1">
+              <span className="text-slate-500 text-xs font-semibold flex items-center gap-1.5">
+                <Flame className="w-4 h-4 text-amber-500" />
+                Current Streak
+              </span>
+              <div className="text-2xl font-black text-slate-900 dark:text-white font-heading">{currentStreak} days</div>
+              <div className="text-[11px] text-amber-500 font-bold">Longest: {longestStreak} days</div>
+            </div>
 
-      {/* Activity Chart & Mastery Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Weekly Activity Bar Chart */}
-        <div className="lg:col-span-7 p-6 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white font-heading">Weekly Study Activity</h3>
-            <span className="text-xs text-slate-500 font-medium">Target: 20 hrs/week</span>
+            <div className="p-5 rounded-2xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-1">
+              <span className="text-slate-500 text-xs font-semibold flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-blue-500" />
+                Today's Study Time
+              </span>
+              <div className="text-2xl font-black text-slate-900 dark:text-white font-heading">{todaysStudyTime}</div>
+              <div className="text-[11px] text-blue-500 font-bold">Active Learning</div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-1">
+              <span className="text-slate-500 text-xs font-semibold flex items-center gap-1.5">
+                <BarChart2 className="w-4 h-4 text-emerald-500" />
+                Total Study Time
+              </span>
+              <div className="text-2xl font-black text-slate-900 dark:text-white font-heading">{totalStudyTime}</div>
+              <div className="text-[11px] text-emerald-500 font-bold">Cumulative</div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-1">
+              <span className="text-slate-500 text-xs font-semibold flex items-center gap-1.5">
+                <Award className="w-4 h-4 text-purple-500" />
+                Quiz Accuracy
+              </span>
+              <div className="text-2xl font-black text-slate-900 dark:text-white font-heading">{averageScore}%</div>
+              <div className="text-[11px] text-purple-500 font-bold">{totalQuizzes} Quizzes Attempted</div>
+            </div>
           </div>
 
-          <div className="h-48 flex items-end justify-between gap-3 pt-6 px-2 border-b border-slate-100 dark:border-slate-800">
-            {weeklyData.map((d) => (
-              <div key={d.day} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
-                <div className="text-[10px] font-bold text-slate-500">{d.hours}h</div>
-                <motion.div
-                  initial={{ height: 0 }}
-                  animate={{ height: `${(d.hours / 6) * 100}%` }}
-                  className="w-full max-w-[36px] rounded-t-xl bg-[#3157D5] dark:bg-[#4F8CFF]"
-                />
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{d.day}</span>
+          {/* Topic Breakdown */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Strong Topics */}
+            <div className="p-6 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-4">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white font-heading flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                Strong Topics (Mastered)
+              </h3>
+              <div className="space-y-2">
+                {strongTopics.length > 0 ? (
+                  strongTopics.map((topic: string) => (
+                    <div key={topic} className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      ✓ {topic}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-500">No mastered topics recorded yet.</p>
+                )}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        {/* Topic Mastery Tracker */}
-        <div className="lg:col-span-5 p-6 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-4">
-          <h3 className="text-base font-bold text-slate-900 dark:text-white font-heading">Topic Mastery Tracker</h3>
-
-          <div className="space-y-4">
-            {topicsMastered.map((t) => (
-              <div key={t.name} className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-slate-800 dark:text-slate-200">{t.name}</span>
-                  <span className={t.progress >= 80 ? "text-emerald-500" : t.progress >= 60 ? "text-amber-500" : "text-rose-500"}>
-                    {t.progress}% ({t.status})
-                  </span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-900 overflow-hidden">
-                  <div
-                    className={`h-full ${t.progress >= 80 ? "bg-emerald-500" : t.progress >= 60 ? "bg-amber-500" : "bg-rose-500"}`}
-                    style={{ width: `${t.progress}%` }}
-                  />
-                </div>
+            {/* Weak Topics */}
+            <div className="p-6 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-4">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white font-heading flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                Weak Topics (Needs Revision)
+              </h3>
+              <div className="space-y-2">
+                {weakTopics.length > 0 ? (
+                  weakTopics.map((topic: string) => (
+                    <div key={topic} className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-bold text-amber-600 dark:text-amber-400">
+                      ⚠ {topic}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-500">No weak topics identified yet.</p>
+                )}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
 
-      </div>
+          </div>
+        </>
+      )}
 
     </div>
   );

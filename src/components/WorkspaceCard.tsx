@@ -46,7 +46,7 @@ export function WorkspaceCard({
     setRotateY(0);
   };
 
-  const cardLink = type === "student" ? "/student" : "#workspaces";
+  const cardLink = "/student";
 
   return (
     <a href={cardLink} className="perspective-1000 block">

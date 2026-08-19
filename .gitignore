@@ -43,3 +43,6 @@ next-env.d.ts
 # nested temp folders
 everyday-ai/
 
+
+# clerk configuration (can include secrets)
+/.clerk/

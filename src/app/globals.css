@@ -149,6 +149,48 @@ html, body {
   border-radius: 3px;
 }
 
+/* Text Shimmer Effect */
+@keyframes textShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.text-shimmer {
+  background: linear-gradient(
+    110deg,
+    #3157D5 0%,
+    #4F8CFF 35%,
+    #93C5FD 50%,
+    #4F8CFF 65%,
+    #3157D5 100%
+  );
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: textShimmer 9s ease-in-out infinite;
+}
+
+.dark .text-shimmer {
+  background: linear-gradient(
+    110deg,
+    #4F8CFF 0%,
+    #60A5FA 35%,
+    #E0F2FE 50%,
+    #60A5FA 65%,
+    #4F8CFF 100%
+  );
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: textShimmer 9s ease-in-out infinite;
+}
+
 /* Focus styles */
 :focus-visible {
   outline: 2px solid var(--brand-accent);
