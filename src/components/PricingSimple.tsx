@@ -50,7 +50,14 @@ const loadRazorpayScript = (): Promise<boolean> => {
 };
 
 export function PricingSimple() {
-  const { user } = useUser();
+  let user: any = null;
+  try {
+    const clerkAuth = useUser();
+    user = clerkAuth ? clerkAuth.user : null;
+  } catch (err) {
+    // Unwrapped Clerk context guard
+  }
+
   const [creditUsage, setCreditUsage] = useState(1240);
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");

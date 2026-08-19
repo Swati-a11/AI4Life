@@ -27,12 +27,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const rawPubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  const isValidKey = Boolean(
+  const isKeyValid = Boolean(
     rawPubKey &&
     rawPubKey.startsWith("pk_") &&
-    !rawPubKey.includes("your_clerk_pub_key")
+    !rawPubKey.includes("your_clerk_pub_key") &&
+    !rawPubKey.includes("vercel.app")
   );
-  const pubKey = isValidKey ? rawPubKey : undefined;
 
   return (
     <html 
@@ -42,7 +42,18 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col font-sans bg-[var(--bg-canvas)] text-[var(--fg-primary)] selection:bg-blue-500/30 selection:text-blue-200 transition-colors duration-300">
-        <ClerkProvider publishableKey={pubKey}>
+        {isKeyValid ? (
+          <ClerkProvider publishableKey={rawPubKey}>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="dark"
+              enableSystem
+              disableTransitionOnChange
+            >
+              {children}
+            </ThemeProvider>
+          </ClerkProvider>
+        ) : (
           <ThemeProvider
             attribute="class"
             defaultTheme="dark"
@@ -51,7 +62,7 @@ export default function RootLayout({
           >
             {children}
           </ThemeProvider>
-        </ClerkProvider>
+        )}
       </body>
     </html>
   );
