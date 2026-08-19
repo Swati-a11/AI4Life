@@ -6,6 +6,7 @@ export class AuthService {
     try {
       const pubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
       const secKey = process.env.CLERK_SECRET_KEY;
+      
       if (pubKey && secKey && pubKey.startsWith("pk_") && !pubKey.includes("your_")) {
         const { userId } = await auth();
         if (userId) {
@@ -13,7 +14,7 @@ export class AuthService {
         }
       }
     } catch (err) {
-      // Clerk auth fallback
+      console.warn("Clerk server auth check warning:", err);
     }
 
     return "clerk_dev_swati_user";

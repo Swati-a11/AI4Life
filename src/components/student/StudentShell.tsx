@@ -102,9 +102,9 @@ export function StudentShell({ currentTab, onTabChange, children }: StudentShell
 
   const handleLogout = () => {
     if (isClerkEnabled && clerk) {
-      clerk.signOut({ redirectUrl: "/" });
+      clerk.signOut({ redirectUrl: "/sign-in" });
     } else {
-      window.location.href = "/";
+      window.location.href = "/sign-in";
     }
   };
 
