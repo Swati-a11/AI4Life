@@ -89,11 +89,6 @@ export function DashboardView({ userName, onTabChange, onOpenUpgradeModal }: Das
       title: "AI4Life Student Workspace",
       image: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=400&q=80",
     },
-    {
-      id: "p2",
-      title: "RAG Vector Search Analyzer",
-      image: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=400&q=80",
-    },
   ];
 
   // Radial progress gauge helper component matching reference screenshot
