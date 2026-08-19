@@ -13,10 +13,10 @@ export class DocxService {
     );
   }
 
-  // Decompress ZIP local entries and extract clean text from <w:t> XML nodes
+  // Decompress ZIP local entries and extract clean text from <w:t> XML nodes inside <w:p> paragraphs
   public static extractTextFromDocxBuffer(buffer: Buffer): { success: boolean; text: string; error?: string } {
     try {
-      let combinedXmlText = "";
+      let combinedParagraphs: string[] = [];
 
       // Scan for PK\x03\x04 local file headers in buffer
       let offset = 0;
@@ -46,7 +46,7 @@ export class DocxService {
                 try {
                   xmlContent = zlib.unzipSync(compressedData).toString("utf-8");
                 } catch (e2) {
-                  console.warn("Docx stream inflate warning for " + fileName);
+                  // Fallback
                 }
               }
             } else if (compressionMethod === 0) {
@@ -54,12 +54,44 @@ export class DocxService {
             }
 
             if (xmlContent) {
-              const wtMatches = Array.from(xmlContent.matchAll(/<w:t[^>]*>([^<]+)<\/w:t>/g));
-              if (wtMatches.length > 0) {
-                const textNode = wtMatches
-                  .map((m) => m[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&quot;/g, '"'))
-                  .join(" ");
-                combinedXmlText += " " + textNode;
+              // Extract paragraph by paragraph <w:p>
+              const pMatches = Array.from(xmlContent.matchAll(/<w:p[^>]*>([\s\S]*?)<\/w:p>/g));
+              if (pMatches.length > 0) {
+                for (const pMatch of pMatches) {
+                  const wtMatches = Array.from(pMatch[1].matchAll(/<w:t[^>]*>([^<]+)<\/w:t>/g));
+                  const pText = wtMatches
+                    .map((m) =>
+                      m[1]
+                        .replace(/&amp;/g, "&")
+                        .replace(/&lt;/g, "<")
+                        .replace(/&gt;/g, ">")
+                        .replace(/&#39;/g, "'")
+                        .replace(/&quot;/g, '"')
+                    )
+                    .join("")
+                    .trim();
+                  if (pText.length > 0) {
+                    combinedParagraphs.push(pText);
+                  }
+                }
+              } else {
+                const wtMatches = Array.from(xmlContent.matchAll(/<w:t[^>]*>([^<]+)<\/w:t>/g));
+                if (wtMatches.length > 0) {
+                  const textNode = wtMatches
+                    .map((m) =>
+                      m[1]
+                        .replace(/&amp;/g, "&")
+                        .replace(/&lt;/g, "<")
+                        .replace(/&gt;/g, ">")
+                        .replace(/&#39;/g, "'")
+                        .replace(/&quot;/g, '"')
+                    )
+                    .join(" ")
+                    .trim();
+                  if (textNode.length > 0) {
+                    combinedParagraphs.push(textNode);
+                  }
+                }
               }
             }
           }
@@ -70,17 +102,30 @@ export class DocxService {
       }
 
       // Fallback: search raw XML string if ZIP iteration yielded empty
-      if (!combinedXmlText || combinedXmlText.trim().length === 0) {
+      if (combinedParagraphs.length === 0) {
         const rawStr = buffer.toString("latin1");
         const wtMatches = Array.from(rawStr.matchAll(/<w:t[^>]*>([^<]+)<\/w:t>/g));
         if (wtMatches.length > 0) {
-          combinedXmlText = wtMatches
-            .map((m) => m[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&quot;/g, '"'))
-            .join(" ");
+          const rawText = wtMatches
+            .map((m) =>
+              m[1]
+                .replace(/&amp;/g, "&")
+                .replace(/&lt;/g, "<")
+                .replace(/&gt;/g, ">")
+                .replace(/&#39;/g, "'")
+                .replace(/&quot;/g, '"')
+            )
+            .join(" ")
+            .trim();
+          if (rawText.length > 0) {
+            combinedParagraphs.push(rawText);
+          }
         }
       }
 
-      const cleanText = combinedXmlText.replace(/\s+/g, " ").trim();
+      const fullText = combinedParagraphs.join("\n\n").trim();
+      const cleanText = fullText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "").trim();
+
       if (cleanText.length > 5 && !this.isRawDocxZip(cleanText)) {
         return { success: true, text: cleanText };
       }

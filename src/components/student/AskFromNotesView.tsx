@@ -18,6 +18,7 @@ import {
   Video
 } from "lucide-react";
 import { StudyMaterial } from "@/lib/types/student-types";
+import { getOrCreateLocalUserId } from "@/lib/utils/user-id-utils";
 
 interface AskFromNotesViewProps {
   onDeductCredits: (cost: number) => boolean;
@@ -48,7 +49,11 @@ export function AskFromNotesView({ onDeductCredits }: AskFromNotesViewProps) {
 
   useEffect(() => {
     setIsLoadingMaterials(true);
-    fetch("/api/upload")
+    const userId = getOrCreateLocalUserId();
+
+    fetch("/api/upload", {
+      headers: { "x-user-id": userId }
+    })
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.documents) {
@@ -77,7 +82,10 @@ export function AskFromNotesView({ onDeductCredits }: AskFromNotesViewProps) {
 
   const handleSelectMaterial = async (id: string) => {
     try {
-      const res = await fetch(`/api/materials/${id}`);
+      const userId = getOrCreateLocalUserId();
+      const res = await fetch(`/api/materials/${id}`, {
+        headers: { "x-user-id": userId }
+      });
       const data = await res.json();
       if (data.success && data.material) {
         setSelectedMaterial(data.material);
@@ -100,12 +108,15 @@ export function AskFromNotesView({ onDeductCredits }: AskFromNotesViewProps) {
 
     setIsAskingMaterial(true);
     try {
-      const res = await fetch("/api/notes", {
+      const userId = getOrCreateLocalUserId();
+      const res = await fetch(`/api/materials/${selectedMaterial.id}/ask`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": userId
+        },
         body: JSON.stringify({
-          query: materialQuestion,
-          documentId: selectedMaterial.id
+          query: materialQuestion
         })
       });
 
@@ -118,7 +129,7 @@ export function AskFromNotesView({ onDeductCredits }: AskFromNotesViewProps) {
         });
       } else {
         setRagResult({
-          answerText: "I couldn't find that information in this material. I can still explain it using general knowledge if you'd like.",
+          answerText: "I couldn't find that information in this material.\n\nYou can ask me something else about this material.",
           isGrounded: false,
           citations: []
         });
@@ -267,9 +278,13 @@ export function AskFromNotesView({ onDeductCredits }: AskFromNotesViewProps) {
                           onClick={async () => {
                             if (!ragResult || !selectedMaterial) return;
                             try {
+                              const userId = getOrCreateLocalUserId();
                               const res = await fetch("/api/notes", {
                                 method: "POST",
-                                headers: { "Content-Type": "application/json" },
+                                headers: {
+                                  "Content-Type": "application/json",
+                                  "x-user-id": userId
+                                },
                                 body: JSON.stringify({
                                   title: materialQuestion.substring(0, 40) || selectedMaterial.title,
                                   content: ragResult.answerText,
