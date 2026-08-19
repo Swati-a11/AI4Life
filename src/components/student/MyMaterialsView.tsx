@@ -98,16 +98,25 @@ export function MyMaterialsView({ onTabChange }: MyMaterialsViewProps) {
         body: formData
       });
 
-      const data = await res.json();
-      if (data.success && data.document) {
+      const contentType = res.headers.get("content-type") || "";
+      let data: any = null;
+
+      if (contentType.includes("application/json")) {
+        data = await res.json().catch(() => null);
+      } else {
+        const text = await res.text().catch(() => "");
+        data = { success: false, error: text || `Upload failed with status ${res.status}` };
+      }
+
+      if (data && data.success && data.document) {
         setUploadStatusText("Content Ready");
         fetchMaterials();
       } else {
-        setUploadStatusText(data.error || "Couldn't process this file.");
+        setUploadStatusText(data?.error || "Couldn't process this file.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Upload API error:", err);
-      setUploadStatusText("Could not extract readable content from this source.");
+      setUploadStatusText(err?.message || "Could not extract readable content from this source.");
     } finally {
       setIsUploading(false);
       setTimeout(() => setUploadStatusText(null), 5000);
@@ -128,18 +137,27 @@ export function MyMaterialsView({ onTabChange }: MyMaterialsViewProps) {
         body: JSON.stringify({ youtubeUrl: youtubeUrlInput })
       });
 
-      const data = await res.json();
-      if (data.success && data.document) {
+      const contentType = res.headers.get("content-type") || "";
+      let data: any = null;
+
+      if (contentType.includes("application/json")) {
+        data = await res.json().catch(() => null);
+      } else {
+        const text = await res.text().catch(() => "");
+        data = { success: false, error: text || `Transcript extraction failed with status ${res.status}` };
+      }
+
+      if (data && data.success && data.document) {
         setUploadStatusText("Transcript Ready");
         setYoutubeUrlInput("");
         setShowYoutubeInput(false);
         fetchMaterials();
       } else {
-        setUploadStatusText(data.error || "Transcript is unavailable for this YouTube video. Please upload the video/audio file directly if you have permission to do so.");
+        setUploadStatusText(data?.error || "Transcript is unavailable for this YouTube video. Please upload the video/audio file directly if you have permission to do so.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("YouTube extraction error:", err);
-      setUploadStatusText("Transcript is unavailable for this YouTube video. Please upload the video/audio file directly if you have permission to do so.");
+      setUploadStatusText(err?.message || "Transcript is unavailable for this YouTube video. Please upload the video/audio file directly if you have permission to do so.");
     } finally {
       setIsUploading(false);
       setTimeout(() => setUploadStatusText(null), 6000);

@@ -27,6 +27,14 @@ export class PdfService {
     );
   }
 
+  // Check if text is garbled/unreadable binary symbols (e.g. font encoding failure)
+  public static isGarbledText(text: string): boolean {
+    if (!text || text.length < 15) return false;
+    const readableCount = (text.match(/[A-Za-z0-9\s.,;:'"!\?\-()\[\]{}\/]/g) || []).length;
+    const ratio = readableCount / text.length;
+    return ratio < 0.55;
+  }
+
   // Central text normalization function (preserves headings, paragraphs, lists, page separation)
   public static normalizeExtractedText(text: string): string {
     if (!text) return "";
@@ -72,7 +80,11 @@ export class PdfService {
         for (let i = 0; i < res.pages.length; i++) {
           const rawPgText = res.pages[i]?.text || "";
           const cleanPgText = this.normalizeExtractedText(rawPgText);
-          if (cleanPgText.length > 0 && !this.containsRawPdfBytes(cleanPgText)) {
+          if (
+            cleanPgText.length > 0 &&
+            !this.containsRawPdfBytes(cleanPgText) &&
+            !this.isGarbledText(cleanPgText)
+          ) {
             pages.push({
               page: res.pages[i]?.num || i + 1,
               text: cleanPgText
@@ -86,7 +98,11 @@ export class PdfService {
         const cleanFull = this.normalizeExtractedText(
           res.text.replace(/--\s*\d+\s*of\s*\d+\s*--/gi, "")
         );
-        if (cleanFull.length > 5 && !this.containsRawPdfBytes(cleanFull)) {
+        if (
+          cleanFull.length > 5 &&
+          !this.containsRawPdfBytes(cleanFull) &&
+          !this.isGarbledText(cleanFull)
+        ) {
           const rawParagraphs = cleanFull.split("\n\n").filter((p) => p.trim().length > 0);
           rawParagraphs.forEach((pText, idx) => {
             pages.push({
@@ -97,13 +113,13 @@ export class PdfService {
         }
       }
 
-      // Scanned / Image-only PDF detection
+      // Scanned / Image-only PDF or custom unreadable font encoding detection
       if (pages.length === 0) {
         return {
           success: false,
-          fullText: "This PDF appears to be scanned/image-based. No selectable text was found.",
+          fullText: "No selectable text was found in this PDF. OCR is required for scanned/image-only PDFs.",
           pages: [],
-          error: "This PDF appears to be scanned/image-based. No selectable text was found."
+          error: "No selectable text was found in this PDF. OCR is required for scanned/image-only PDFs."
         };
       }
 
@@ -129,7 +145,7 @@ export class PdfService {
   public static extractTextFromPdfBuffer(buffer: Buffer): ParsedPdfResult {
     return {
       success: false,
-      fullText: "This PDF appears to be scanned/image-based. No selectable text was found.",
+      fullText: "No selectable text was found in this PDF. OCR is required for scanned/image-only PDFs.",
       pages: [],
       error: "Use extractTextFromPdfBufferAsync."
     };
@@ -150,7 +166,7 @@ export class PdfService {
       ];
     }
 
-    const hasBadBinary = chunks.some((c) => this.containsRawPdfBytes(c.text));
+    const hasBadBinary = chunks.some((c) => this.containsRawPdfBytes(c.text) || this.isGarbledText(c.text));
     if (!hasBadBinary) {
       return chunks;
     }
@@ -158,7 +174,7 @@ export class PdfService {
     // Clean out raw binary chunks
     const cleanedChunks = chunks
       .map((c) => {
-        if (this.containsRawPdfBytes(c.text)) {
+        if (this.containsRawPdfBytes(c.text) || this.isGarbledText(c.text)) {
           const asciiOnly = this.normalizeExtractedText(
             c.text
               .replace(/%PDF[\s\S]*?endstream/g, "")
@@ -166,7 +182,7 @@ export class PdfService {
               .replace(/[^\x20-\x7E\n]/g, " ")
           );
 
-          if (asciiOnly.length > 15 && !this.containsRawPdfBytes(asciiOnly)) {
+          if (asciiOnly.length > 15 && !this.containsRawPdfBytes(asciiOnly) && !this.isGarbledText(asciiOnly)) {
             return { ...c, text: asciiOnly };
           }
           return null;
@@ -182,7 +198,7 @@ export class PdfService {
     return [
       {
         id: `clean_c_failed`,
-        text: `This PDF appears to be scanned/image-based. No selectable text was found.`,
+        text: `No selectable text was found in this PDF. OCR is required for scanned/image-only PDFs.`,
         page: 1
       }
     ];

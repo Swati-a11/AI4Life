@@ -16,6 +16,23 @@ export class DocxService {
   // Decompress ZIP local entries and extract clean text from <w:t> XML nodes inside <w:p> paragraphs
   public static extractTextFromDocxBuffer(buffer: Buffer): { success: boolean; text: string; error?: string } {
     try {
+      if (!buffer || buffer.length === 0) {
+        return {
+          success: false,
+          text: "Could not extract readable content from this DOCX file.",
+          error: "Empty buffer."
+        };
+      }
+
+      // Check for legacy binary .doc (OLE2 CFBF header)
+      if (buffer[0] === 0xd0 && buffer[1] === 0xcf && buffer[2] === 0x11 && buffer[3] === 0xe0) {
+        return {
+          success: false,
+          text: "Legacy binary .doc format is not supported. Please save or convert as a modern .docx file.",
+          error: "Legacy binary .doc format is not supported. Please save or convert as a modern .docx file."
+        };
+      }
+
       let combinedParagraphs: string[] = [];
 
       // Scan for PK\x03\x04 local file headers in buffer

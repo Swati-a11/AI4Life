@@ -5,6 +5,9 @@ import { AuthService } from "@/lib/services/auth-service";
 import { PdfService } from "@/lib/services/pdf-service";
 import { DocxService } from "@/lib/services/docx-service";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   try {
     const userId = await AuthService.getUserIdFromRequest(req);
@@ -12,15 +15,18 @@ export async function POST(req: NextRequest) {
 
     // 1. Process YouTube URL request (JSON body)
     if (contentType.includes("application/json")) {
-      const body = await req.json();
+      const body = await req.json().catch(() => ({}));
       const { youtubeUrl } = body;
 
       if (!youtubeUrl || typeof youtubeUrl !== "string") {
-        return NextResponse.json({
-          success: false,
-          errorCode: "INVALID_URL",
-          error: "Please provide a valid YouTube video URL."
-        }, { status: 200 });
+        return NextResponse.json(
+          {
+            success: false,
+            errorCode: "INVALID_URL",
+            error: "Please provide a valid YouTube video URL."
+          },
+          { status: 400 }
+        );
       }
 
       console.log("[Material Processing]", {
@@ -32,11 +38,14 @@ export async function POST(req: NextRequest) {
 
       const result = await YouTubeService.extractTranscript(youtubeUrl);
       if (!result.success || !result.chunks) {
-        return NextResponse.json({
-          success: false,
-          errorCode: result.errorCode || "TRANSCRIPT_UNAVAILABLE",
-          error: result.error || "Transcript is unavailable for this YouTube video. You can upload the video/audio file directly if you have permission to do so."
-        }, { status: 200 });
+        return NextResponse.json(
+          {
+            success: false,
+            errorCode: result.errorCode || "TRANSCRIPT_UNAVAILABLE",
+            error: result.error || "Transcript is unavailable for this YouTube video. You can upload the video/audio file directly if you have permission to do so."
+          },
+          { status: 400 }
+        );
       }
 
       const newDoc: StoredDocument = {
@@ -69,26 +78,29 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Process Multimodal File Upload (PDF, DOCX, TXT, MP4, MOV, SVG via FormData)
-    const formData = await req.formData();
+    const formData = await req.formData().catch(() => null);
+    if (!formData) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid upload request data."
+        },
+        { status: 400 }
+      );
+    }
+
     const file = (formData.get("file") || formData.get("document") || formData.get("media")) as File | null;
 
     if (!file || file.size === 0) {
-      return NextResponse.json({
-        success: false,
-        error: "No valid file received. Please select a document or video file to upload."
-      }, { status: 200 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "No valid file received. Please select a document or video file to upload."
+        },
+        { status: 400 }
+      );
     }
 
-    // Size validation: max 100MB for video/docs
-    const maxSizeBytes = 100 * 1024 * 1024;
-    if (file.size > maxSizeBytes) {
-      return NextResponse.json({
-        success: false,
-        error: "This video is too large. Please upload a video under 100 MB."
-      }, { status: 200 });
-    }
-
-    const sizeMb = Number((file.size / (1024 * 1024)).toFixed(1));
     const title = file.name || "Uploaded_Material";
     const lowerName = title.toLowerCase();
 
@@ -114,6 +126,24 @@ export async function POST(req: NextRequest) {
       sourceType = "mp4";
     }
     else if (lowerName.endsWith(".svg")) sourceType = "svg";
+
+    // Size validation: 25MB for documents, 100MB for video
+    const maxDocSizeBytes = 25 * 1024 * 1024;
+    const maxVideoSizeBytes = 100 * 1024 * 1024;
+    const allowedLimit = sourceType === "mp4" ? maxVideoSizeBytes : maxDocSizeBytes;
+    const maxMb = sourceType === "mp4" ? 100 : 25;
+
+    if (file.size > allowedLimit) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `File is too large. Maximum allowed size is ${maxMb} MB.`
+        },
+        { status: 400 }
+      );
+    }
+
+    const sizeMb = Number((file.size / (1024 * 1024)).toFixed(1));
 
     console.log("[Material Processing]", {
       sourceType,
@@ -145,11 +175,11 @@ export async function POST(req: NextRequest) {
         }));
       } else {
         processingStatus = "failed";
-        error = pdfParsed.error || "This PDF does not contain selectable text. OCR is required to read its content.";
+        error = pdfParsed.error || "No selectable text was found in this PDF. OCR is required for scanned/image-only PDFs.";
         chunks = [
           {
             id: `pdf_c_fail_${Date.now()}`,
-            text: "This PDF does not contain selectable text. OCR is required to read its content.",
+            text: error,
             page: 1
           }
         ];
@@ -178,11 +208,11 @@ export async function POST(req: NextRequest) {
               ];
       } else {
         processingStatus = "failed";
-        error = "Could not extract readable content from this DOCX file.";
+        error = docxResult.error || "Could not extract readable content from this DOCX file.";
         chunks = [
           {
             id: `docx_c_fail_${Date.now()}`,
-            text: "Could not extract readable content from this DOCX file.",
+            text: error,
             page: 1
           }
         ];
@@ -207,13 +237,6 @@ export async function POST(req: NextRequest) {
     else if (sourceType === "mp4") {
       const apiKey = process.env.GEMINI_API_KEY;
       let transcribedSpeech = "";
-
-      console.log("[Material Processing] Audio Stream Probe", {
-        fileName: title,
-        sizeBytes: file.size,
-        mimeType: file.type,
-        detectedFormat: lowerName.endsWith(".mov") ? "QuickTime MOV" : "MP4 Video"
-      });
 
       if (apiKey && buffer && buffer.length > 0) {
         try {
@@ -344,11 +367,14 @@ export async function POST(req: NextRequest) {
         error: newDoc.error
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in /api/upload route:", error);
     return NextResponse.json(
-      { success: false, error: "Couldn't process this source file. Please ensure it is a valid PDF, DOCX, TXT, MP4, MOV, SVG, or YouTube URL." },
-      { status: 200 }
+      {
+        success: false,
+        error: error?.message || "Couldn't process this source file. Please ensure it is a valid PDF, DOCX, TXT, MP4, MOV, SVG, or YouTube URL."
+      },
+      { status: 500 }
     );
   }
 }
