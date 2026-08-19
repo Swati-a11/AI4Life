@@ -27,9 +27,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const rawPubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  const pubKey = rawPubKey && rawPubKey.startsWith("pk_")
-    ? rawPubKey
-    : "pk_test_Y2xlcmstZGV2LXN3YXRpLWFpNGxpZmUudmVyY2VsLmFwcCQ";
+  const isValidKey = Boolean(
+    rawPubKey &&
+    rawPubKey.startsWith("pk_") &&
+    !rawPubKey.includes("vercel.app") &&
+    !rawPubKey.includes("your_clerk_pub_key")
+  );
+  const pubKey = isValidKey ? rawPubKey : undefined;
 
   return (
     <html 
