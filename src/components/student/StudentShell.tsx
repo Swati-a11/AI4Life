@@ -37,6 +37,7 @@ export function StudentShell({ currentTab, onTabChange, children }: StudentShell
   const [credits, setCredits] = useState<number>(420);
   const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -47,6 +48,7 @@ export function StudentShell({ currentTab, onTabChange, children }: StudentShell
   const [currentUser, setCurrentUser] = useState<any>({ name: "Swati Kumari", email: "swati@student.ai4life.com" });
 
   useEffect(() => {
+    setIsMounted(true);
     const userId = getOrCreateLocalUserId();
     const currentCredits = CreditService.getCredits(userId);
     setCredits(currentCredits);
@@ -176,7 +178,7 @@ export function StudentShell({ currentTab, onTabChange, children }: StudentShell
           {/* Credit Pill */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300">
             <Zap className="w-3.5 h-3.5 fill-current text-amber-500" />
-            <span className="text-xs font-black">{credits}</span>
+            <span className="text-xs font-black">{isMounted ? credits : 420}</span>
             <button
               onClick={() => setIsUpgradeOpen(true)}
               className="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500 text-white hover:bg-amber-600 transition-colors cursor-pointer"
