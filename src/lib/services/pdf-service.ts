@@ -1,5 +1,3 @@
-import { PDFParse } from "pdf-parse";
-
 export interface ParsedPdfResult {
   success: boolean;
   fullText: string;
@@ -47,7 +45,7 @@ export class PdfService {
       .trim();
   }
 
-  // Robust PDF text extraction using PDFParse engine
+  // Robust PDF text extraction using clean pdf-parse core library
   public static async extractTextFromPdfBufferAsync(buffer: Buffer): Promise<ParsedPdfResult> {
     try {
       if (!buffer || buffer.length === 0) {
@@ -70,30 +68,58 @@ export class PdfService {
         };
       }
 
-      const parser = new PDFParse({ data: buffer });
-      await (parser as any).load();
-      const res = await parser.getText();
-
-      const pages: { page: number; text: string }[] = [];
-
-      if (res && res.pages && Array.isArray(res.pages)) {
-        for (let i = 0; i < res.pages.length; i++) {
-          const rawPgText = res.pages[i]?.text || "";
-          const cleanPgText = this.normalizeExtractedText(rawPgText);
-          if (
-            cleanPgText.length > 0 &&
-            !this.containsRawPdfBytes(cleanPgText) &&
-            !this.isGarbledText(cleanPgText)
-          ) {
-            pages.push({
-              page: res.pages[i]?.num || i + 1,
-              text: cleanPgText
-            });
-          }
-        }
+      // Dynamically load clean pdf-parse core module without top-level test runner side effects
+      let pdfParseCore: any = null;
+      try {
+        pdfParseCore = require("pdf-parse/lib/pdf-parse.js");
+      } catch (e) {
+        console.warn("[PdfService] Error requiring pdf-parse core module:", e);
       }
 
-      // Fallback to full res.text if pages array was empty
+      if (!pdfParseCore) {
+        return {
+          success: false,
+          fullText: "No selectable text was found in this PDF. OCR is required for scanned/image-only PDFs.",
+          pages: [],
+          error: "PDF parser unavailable."
+        };
+      }
+
+      const pages: { page: number; text: string }[] = [];
+      let pageCounter = 1;
+
+      const res = await pdfParseCore(buffer, {
+        pagerender: async (pageData: any) => {
+          try {
+            const textContent = await pageData.getTextContent();
+            let lastY: number | null = null;
+            let pageStr = "";
+            for (const item of textContent.items) {
+              if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) {
+                pageStr += "\n";
+              }
+              pageStr += item.str + " ";
+              lastY = item.transform[5];
+            }
+            const cleanStr = PdfService.normalizeExtractedText(pageStr);
+            if (
+              cleanStr.length > 0 &&
+              !PdfService.containsRawPdfBytes(cleanStr) &&
+              !PdfService.isGarbledText(cleanStr)
+            ) {
+              pages.push({
+                page: pageCounter++,
+                text: cleanStr
+              });
+            }
+            return pageStr;
+          } catch (e) {
+            return "";
+          }
+        }
+      });
+
+      // Fallback to res.text if page extraction callback yielded empty
       if (pages.length === 0 && res && res.text) {
         const cleanFull = this.normalizeExtractedText(
           res.text.replace(/--\s*\d+\s*of\s*\d+\s*--/gi, "")
