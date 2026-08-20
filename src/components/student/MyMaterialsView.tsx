@@ -22,6 +22,13 @@ import {
 } from "lucide-react";
 import { StudyMaterial, StudentTab } from "@/lib/types/student-types";
 import { getOrCreateLocalUserId } from "@/lib/utils/user-id-utils";
+import {
+  CachedMaterial,
+  loadMaterialsFromCache,
+  saveMaterialToCache,
+  removeMaterialFromCache,
+  getMaterialFromCache
+} from "@/lib/utils/materials-cache";
 
 interface MyMaterialsViewProps {
   onTabChange: (tab: StudentTab) => void;
@@ -48,35 +55,33 @@ export function MyMaterialsView({ onTabChange }: MyMaterialsViewProps) {
   } | null>(null);
   const [isFetchingSource, setIsFetchingSource] = useState(false);
 
-  const fetchMaterials = () => {
+  // Load materials from client-side localStorage cache (works across page reloads on Vercel)
+  const loadMaterialsFromLocalCache = () => {
     setIsLoading(true);
-    const userId = getOrCreateLocalUserId();
-    fetch("/api/upload", {
-      headers: { "x-user-id": userId }
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.documents) {
-          const mapped: StudyMaterial[] = data.documents.map((d: any) => ({
-            id: d.id,
-            title: d.title,
-            subject: d.sourceType === "youtube" ? "Operating Systems" : "Computer Science",
-            fileType: d.sourceType || "pdf",
-            sizeMb: d.sizeMb || 1.2,
-            uploadedAt: d.uploadedAt || "Recently",
-            status: d.processingStatus === "ready" ? "Ready" : "Processing",
-            chunksCount: d.chunks ? d.chunks.length : 0,
-            qdrantCollectionRef: `qdrant_${d.id}`
-          }));
-          setMaterials(mapped);
-        }
-      })
-      .catch(console.error)
-      .finally(() => setIsLoading(false));
+    try {
+      const userId = getOrCreateLocalUserId();
+      const cached = loadMaterialsFromCache(userId);
+      const mapped: StudyMaterial[] = cached.map((m) => ({
+        id: m.id,
+        title: m.title,
+        subject: m.sourceType === "youtube" ? "Operating Systems" : "Computer Science",
+        fileType: (m.sourceType || "pdf") as StudyMaterial["fileType"],
+        sizeMb: m.sizeMb || 1.2,
+        uploadedAt: m.uploadedAt || "Recently",
+        status: m.status === "ready" ? "Ready" : "Processing",
+        chunksCount: m.chunksCount || 0,
+        qdrantCollectionRef: `qdrant_${m.id}`
+      }));
+      setMaterials(mapped);
+    } catch (err) {
+      console.error("Cache load error:", err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchMaterials();
+    loadMaterialsFromLocalCache();
   }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,9 +119,29 @@ export function MyMaterialsView({ onTabChange }: MyMaterialsViewProps) {
         data = { success: false, error: text || `Upload failed with status ${res.status}` };
       }
 
-      if (data && data.success && data.document) {
+      if (data && data.success && data.document && data.material) {
+        // Save full material (including extracted content) to localStorage cache
+        const userId = getOrCreateLocalUserId();
+        const mat = data.material;
+        const docMeta = data.document;
+        const cachedMat: CachedMaterial = {
+          id: mat.id || docMeta.id,
+          materialId: mat.id || docMeta.id,
+          title: mat.title || mat.name || docMeta.title || file.name,
+          name: mat.name || mat.title || file.name,
+          sourceType: mat.sourceType || mat.type || docMeta.sourceType || "pdf",
+          type: mat.type || mat.sourceType || "pdf",
+          sizeMb: mat.sizeMb || docMeta.sizeMb || 1.2,
+          uploadedAt: mat.uploadedAt || new Date().toISOString().split("T")[0],
+          status: mat.status || docMeta.status || "ready",
+          content: mat.content || mat.extractedText || "",
+          extractedText: mat.extractedText || mat.content || "",
+          chunksCount: docMeta.chunksGenerated || 0,
+          userId
+        };
+        saveMaterialToCache(cachedMat);
         setUploadStatusText("Content Ready");
-        fetchMaterials();
+        loadMaterialsFromLocalCache();
       } else {
         setUploadStatusText(data?.error || "Couldn't process this file.");
       }
@@ -157,11 +182,31 @@ export function MyMaterialsView({ onTabChange }: MyMaterialsViewProps) {
         data = { success: false, error: text || `Transcript extraction failed with status ${res.status}` };
       }
 
-      if (data && data.success && data.document) {
+      if (data && data.success && data.document && data.material) {
+        // Save full YouTube material to localStorage cache
+        const userId = getOrCreateLocalUserId();
+        const mat = data.material;
+        const docMeta = data.document;
+        const cachedMat: CachedMaterial = {
+          id: mat.id || docMeta.id,
+          materialId: mat.id || docMeta.id,
+          title: mat.title || mat.name || docMeta.title || "YouTube Material",
+          name: mat.name || mat.title || "YouTube Material",
+          sourceType: "youtube",
+          type: "youtube",
+          sizeMb: mat.sizeMb || 0.8,
+          uploadedAt: mat.uploadedAt || new Date().toISOString().split("T")[0],
+          status: mat.status || "ready",
+          content: mat.content || mat.extractedText || "",
+          extractedText: mat.extractedText || mat.content || "",
+          chunksCount: docMeta.chunksGenerated || 0,
+          userId
+        };
+        saveMaterialToCache(cachedMat);
         setUploadStatusText("Transcript Ready");
         setYoutubeUrlInput("");
         setShowYoutubeInput(false);
-        fetchMaterials();
+        loadMaterialsFromLocalCache();
       } else {
         setUploadStatusText(data?.error || "Transcript is unavailable for this YouTube video. Please upload the video/audio file directly if you have permission to do so.");
       }
@@ -177,12 +222,44 @@ export function MyMaterialsView({ onTabChange }: MyMaterialsViewProps) {
   const handleOpenSourceViewer = async (id: string) => {
     setIsFetchingSource(true);
     try {
+      // Try local cache first (works across page reloads without server state)
+      const cached = getMaterialFromCache(id);
+      if (cached) {
+        setViewingMaterial({
+          id: cached.id,
+          title: cached.title,
+          sourceType: cached.sourceType,
+          sizeMb: cached.sizeMb,
+          extractedText: cached.extractedText || cached.content || "No extractable content found."
+        });
+        setIsFetchingSource(false);
+        return;
+      }
+
+      // Fallback: try server (in case cache was cleared)
       const userId = getOrCreateLocalUserId();
       const res = await fetch(`/api/materials/${id}`, {
         headers: { "x-user-id": userId }
       });
       const data = await res.json();
       if (data.success && data.material) {
+        // Save to cache for future lookups
+        const mat = data.material;
+        saveMaterialToCache({
+          id: mat.id,
+          materialId: mat.id,
+          title: mat.title || mat.name,
+          name: mat.name || mat.title,
+          sourceType: mat.sourceType || mat.type,
+          type: mat.type || mat.sourceType,
+          sizeMb: mat.sizeMb || 1.2,
+          uploadedAt: mat.uploadedAt || new Date().toISOString().split("T")[0],
+          status: mat.status || "ready",
+          content: mat.content || mat.extractedText || "",
+          extractedText: mat.extractedText || mat.content || "",
+          chunksCount: mat.chunks?.length || 0,
+          userId
+        });
         setViewingMaterial(data.material);
       } else {
         alert(data.error || "Could not extract readable content from this source.");
@@ -196,6 +273,7 @@ export function MyMaterialsView({ onTabChange }: MyMaterialsViewProps) {
   };
 
   const handleDelete = (id: string) => {
+    removeMaterialFromCache(id);
     setMaterials((prev) => prev.filter((m) => m.id !== id));
   };
 

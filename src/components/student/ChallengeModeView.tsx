@@ -24,6 +24,7 @@ import {
   HelpCircle
 } from "lucide-react";
 import { BaaziBattleResult } from "@/lib/services/server-store";
+import { loadMaterialsFromCache, getMaterialFromCache } from "@/lib/utils/materials-cache";
 
 interface ChallengeModeViewProps {
   onDeductCredits?: (cost: number) => boolean;
@@ -184,14 +185,14 @@ export function ChallengeModeView({ onDeductCredits }: ChallengeModeViewProps) {
       })
       .catch(console.error);
 
-    fetch("/api/upload")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.documents) {
-          setMaterials(data.documents);
-        }
-      })
-      .catch(console.error);
+    try {
+      const cached = loadMaterialsFromCache();
+      if (cached.length > 0) {
+        setMaterials(cached.map((m: any) => ({ id: m.id, title: m.title, sourceType: m.sourceType })));
+      }
+    } catch (e) {
+      console.error("ChallengeModeView cache load error:", e);
+    }
   }, []);
 
   const handleOpenConfirmation = () => {
@@ -231,14 +232,19 @@ export function ChallengeModeView({ onDeductCredits }: ChallengeModeViewProps) {
 
         // Fetch material content for Human Advantage view if selected
         if (battleMode === "material" && selectedMaterialId) {
-          fetch(`/api/materials/${selectedMaterialId}`)
-            .then((r) => r.json())
-            .then((d) => {
-              if (d.success && d.material) {
-                setActiveMaterialContent(d.material.extractedText || "");
-              }
-            })
-            .catch(console.error);
+          const cachedMat = getMaterialFromCache(selectedMaterialId);
+          if (cachedMat) {
+            setActiveMaterialContent(cachedMat.extractedText || cachedMat.content || "");
+          } else {
+            fetch(`/api/materials/${selectedMaterialId}`)
+              .then((r) => r.json())
+              .then((d) => {
+                if (d.success && d.material) {
+                  setActiveMaterialContent(d.material.extractedText || "");
+                }
+              })
+              .catch(console.error);
+          }
         }
       } else {
         setErrorText(data.error || "AI Se Baazi requires 20 credits.");
