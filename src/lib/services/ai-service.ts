@@ -131,115 +131,97 @@ export class GeminiAIService {
     );
   }
 
-  // Extract explicit topic from user query
-  public static detectExplicitTopicFromQuery(text: string): string | null {
-    const textLower = text.toLowerCase().trim();
+  public static normalizeTopicName(topic: string): string {
+    const t = topic.trim().replace(/^[-:•*\s]+|[-:•*\s]+$/g, "").trim();
+    const lower = t.toLowerCase();
 
-    const patterns = [
-      /topic\s*[:\-]\s*([a-z0-9\s]+)/i,
-      /quiz\s+me\s+for\s+the\s+topic\s+([a-z0-9\s]+)/i,
-      /quiz\s+me\s+on\s+([a-z0-9\s]+)/i,
-      /quiz\s+me\s+about\s+([a-z0-9\s]+)/i,
-      /give\s+me\s+an?\s+example\s+of\s+([a-z0-9\s]+)/i,
-      /give\s+me\s+examples?\s+for\s+([a-z0-9\s]+)/i,
-      /give\s+me\s+examples?\s+of\s+([a-z0-9\s]+)/i,
-      /give\s+an?\s+example\s+of\s+([a-z0-9\s]+)/i,
-      /explain\s+([a-z0-9\s]+)/i,
-      /teach\s+me\s+([a-z0-9\s]+)/i,
-      /what\s+is\s+([a-z0-9\s]+)/i,
-      /what\s+are\s+([a-z0-9\s]+)/i,
-      /tell\s+me\s+about\s+([a-z0-9\s]+)/i,
-      /how\s+does\s+([a-z0-9\s]+)\s+work/i,
-      /how\s+do\s+([a-z0-9\s]+)\s+work/i,
-      /i\s+want\s+to\s+learn\s+([a-z0-9\s]+)/i
-    ];
+    if (lower === "react" || lower === "reactjs" || lower === "react.js") return "React";
+    if (lower === "react components" || lower === "react component") return "React Components";
+    if (lower === "python" || lower === "python3") return "Python";
+    if (lower === "python loops" || lower === "python loop" || lower === "loops in python") return "Python Loops";
+    if (lower === "javascript" || lower === "js") return "JavaScript";
+    if (lower === "dsa" || lower === "data structures and algorithms" || lower === "data structures") return "DSA";
+    if (lower === "binary search") return "Binary Search";
+    if (lower === "mongodb" || lower === "mongo") return "MongoDB";
+    if (lower === "sql") return "SQL";
+    if (lower === "os" || lower === "operating systems" || lower === "operating system") return "Operating Systems";
+    if (lower === "recursion") return "Recursion";
+    if (lower === "photosynthesis") return "Photosynthesis";
+    if (lower === "blockchain") return "Blockchain";
+    if (lower === "gravity") return "Gravity";
+    if (lower === "oops" || lower === "oop" || lower === "object oriented programming") return "OOPs";
 
-    for (const pattern of patterns) {
-      const match = text.match(pattern);
-      if (match && match[1]) {
-        const extracted = match[1]
-          .replace(/\b(please|thanks|now|today|from this source|from pdf|from material|clearly|simply|with example|in detail)\b/gi, "")
-          .trim();
-        if (extracted.length > 0 && extracted !== "this source" && extracted !== "this pdf" && extracted !== "it" && extracted !== "that" && extracted !== "more") {
-          return extracted.charAt(0).toUpperCase() + extracted.slice(1);
-        }
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
+  // Extract explicit topic from user query with highest precedence
+  public static extractExplicitTopic(text: string): string | null {
+    if (!text || typeof text !== "string") return null;
+    const raw = text.trim();
+    const textLower = raw.toLowerCase();
+
+    if (
+      this.isCasualOrGreeting(textLower) ||
+      this.isShortConfirmation(textLower) ||
+      this.isShortNegation(textLower)
+    ) {
+      return null;
+    }
+
+    // 1. Topic prefixes (e.g. "topic - Python", "Topic: Python", "topic python", "switch to Python", "test me on Python")
+    const topicPrefixMatch = raw.match(/^(?:topic\s*[-:]?\s*|switch\s+(?:topic\s+)?to\s+|change\s+(?:topic\s+)?to\s+|practice\s+|let'?s\s+practice\s+|test\s+me\s+on\s+|quiz\s+me\s+(?:on|about|for\s+the\s+topic|for)?\s*|teach\s+me\s+|explain\s+|what\s+is\s+|what\s+are\s+|tell\s+me\s+about\s+|i\s+want\s+to\s+learn\s+|i\s+want\s+a\s+)([a-zA-Z0-9\s#+.-]+?)(?:\s+quiz|\?|$)/i);
+    if (topicPrefixMatch && topicPrefixMatch[1]) {
+      const candidate = topicPrefixMatch[1].trim();
+      if (candidate.length > 0 && !candidate.startsWith("this") && candidate !== "it" && candidate !== "that") {
+        return this.normalizeTopicName(candidate);
       }
     }
 
-    const conceptObj = this.detectExplicitConcept(text);
-    if (conceptObj) {
-      return conceptObj.concept;
+    // 2. Pattern: "I want a Python quiz" / "give me a Python quiz"
+    const wantQuizMatch = raw.match(/(?:i\s+want|give\s+me)\s+(?:a\s+)?([a-zA-Z0-9\s#+.-]+?)\s+quiz/i);
+    if (wantQuizMatch && wantQuizMatch[1]) {
+      return this.normalizeTopicName(wantQuizMatch[1]);
+    }
+
+    // 3. Pattern: "Quiz me on Python" / "Quiz me Python"
+    const quizMeMatch = raw.match(/quiz\s+me\s+(?:on\s+|about\s+|for\s+)?([a-zA-Z0-9\s#+.-]+)/i);
+    if (quizMeMatch && quizMeMatch[1]) {
+      return this.normalizeTopicName(quizMeMatch[1]);
+    }
+
+    // 4. Standalone direct keywords when short query (1-4 words)
+    const words = raw.split(/\s+/).filter(Boolean);
+    if (words.length <= 4) {
+      if (textLower.includes("javascript") || textLower === "js") return "JavaScript";
+      if (textLower.includes("python loops") || textLower.includes("python loop")) return "Python Loops";
+      if (textLower.includes("python")) return "Python";
+      if (textLower.includes("react components") || textLower.includes("react component")) return "React Components";
+      if (textLower.includes("react")) return "React";
+      if (textLower === "dsa" || textLower.includes("data structures")) return "DSA";
+      if (textLower.includes("binary search")) return "Binary Search";
+      if (textLower.includes("mongodb") || textLower === "mongo") return "MongoDB";
+      if (textLower === "sql" || textLower.includes("sql database")) return "SQL";
+      if (textLower.includes("operating systems") || textLower === "os" || textLower.includes("operating system")) return "Operating Systems";
+      if (textLower.includes("recursion")) return "Recursion";
+      if (textLower.includes("photosynthesis")) return "Photosynthesis";
+      if (textLower.includes("blockchain")) return "Blockchain";
+      if (textLower.includes("gravity")) return "Gravity";
+      if (textLower.includes("oops") || textLower.includes("object oriented")) return "OOPs";
     }
 
     return null;
   }
 
+  // Backward-compatible alias
+  public static detectExplicitTopicFromQuery(text: string): string | null {
+    return this.extractExplicitTopic(text);
+  }
+
   private static detectExplicitConcept(text: string): { topic: string; concept: string } | null {
-    const textLower = text.toLowerCase().trim();
-
-    if (this.isCasualOrGreeting(textLower) || this.isShortConfirmation(textLower) || this.isShortNegation(textLower)) {
-      return null;
+    const topic = this.extractExplicitTopic(text);
+    if (topic) {
+      return { topic, concept: topic };
     }
-
-    const isExplicitRequest =
-      textLower.startsWith("what is") ||
-      textLower.startsWith("what are") ||
-      textLower.startsWith("explain") ||
-      textLower.startsWith("tell me about") ||
-      textLower.startsWith("how does") ||
-      textLower.startsWith("how do") ||
-      textLower.startsWith("i want to learn") ||
-      textLower.includes("want to learn") ||
-      textLower.startsWith("teach me") ||
-      textLower.includes("quiz me") ||
-      textLower.includes("topic-") ||
-      textLower.includes("topic:");
-
-    if (!isExplicitRequest) {
-      return null;
-    }
-
-    if (textLower.includes("javascript") || textLower.includes("js")) return { topic: "JavaScript", concept: "JavaScript" };
-    if (textLower.includes("artificial intelligence") || /\b(ai)\b/i.test(textLower)) return { topic: "AI", concept: "AI" };
-    if (textLower.includes("photosynthesis")) return { topic: "Photosynthesis", concept: "Photosynthesis" };
-    if (textLower.includes("oxygen")) return { topic: "Oxygen", concept: "Oxygen" };
-    if (textLower.includes("gravity")) return { topic: "Gravity", concept: "Gravity" };
-    if (textLower.includes("blockchain")) return { topic: "Blockchain", concept: "Blockchain" };
-    if (textLower.includes("global warming") || textLower.includes("climate change")) {
-      return { topic: "Global Warming", concept: "Global Warming" };
-    }
-
-    if (textLower.includes("mongodb")) return { topic: "MongoDB", concept: "MongoDB" };
-    if (textLower.includes("sql") && !textLower.includes("nosql")) return { topic: "SQL", concept: "SQL" };
-    if (textLower.includes("database normalization")) return { topic: "Database Normalization", concept: "Database Normalization" };
-    if (textLower.includes("database") || textLower.includes("dbms")) return { topic: "Database", concept: "Database" };
-
-    if (textLower.includes("java") && !textLower.includes("javascript")) return { topic: "Java", concept: "Java" };
-
-    if (textLower.includes("loop in python") || textLower.includes("python loop") || textLower.includes("python loops")) {
-      return { topic: "Python", concept: "Python loops" };
-    }
-    if (textLower.includes("python")) return { topic: "Python", concept: "Python" };
-
-    if (textLower.includes("react component") || textLower.includes("react components")) return { topic: "React", concept: "React components" };
-    if (textLower.includes("react")) return { topic: "React", concept: "React" };
-
-    if (/\b(operating systems?|os)\b/i.test(textLower)) return { topic: "Operating Systems", concept: "Operating Systems" };
-    if (textLower.includes("binary search")) return { topic: "Binary Search", concept: "Binary Search" };
-    if (textLower.includes("recursion")) return { topic: "Recursion", concept: "Recursion" };
-    if (textLower.includes("tree")) return { topic: "Tree", concept: "Tree" };
-    if (textLower.includes("oops") || textLower.includes("object oriented")) return { topic: "Oops", concept: "Oops" };
-
-    const cleaned = text
-      .replace(/\b(give me an example of|give me examples of|give me examples for|give example|quiz me for the topic|quiz me on|quiz me about|topic-|topic:|what is|what are|explain|teach me|tell me about|how does|how do|i want to learn)\b/gi, "")
-      .replace(/\?/g, "")
-      .trim();
-
-    if (cleaned.length > 0 && !cleaned.includes("this source") && !cleaned.includes("this pdf") && cleaned !== "it" && cleaned !== "that") {
-      const cap = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-      return { topic: cap, concept: cap };
-    }
-
     return null;
   }
 
@@ -681,7 +663,7 @@ export class GeminiAIService {
 
     if (apiKey && materialText && materialText.trim().length > 30) {
       try {
-        const prompt = `You are an AI quiz generator. Generate ${questionCount} multiple-choice questions based strictly on the provided study material below.
+        const prompt = `You are an AI quiz generator. Generate ${questionCount} distinct, non-duplicate multiple-choice questions based strictly on the provided study material below.
 
 Document Title: "${docTitle}"
 Study Material Context:
@@ -691,7 +673,7 @@ ${materialText.substring(0, 3000)}
 
 Instructions:
 1. Use ONLY the provided material as the knowledge source. Do not introduce facts that are not supported by the material.
-2. Every question must be answerable directly from the provided material.
+2. Every question must be unique and answerable directly from the provided material.
 3. Return ONLY a valid JSON array of question objects without markdown wrapping. Each object must have:
 - "id": string (e.g. "q1")
 - "question": string
@@ -718,7 +700,17 @@ Instructions:
             const cleanJson = jsonText.replace(/```json/g, "").replace(/```/g, "").trim();
             const parsedQuestions = JSON.parse(cleanJson);
             if (Array.isArray(parsedQuestions) && parsedQuestions.length > 0) {
-              return parsedQuestions.slice(0, questionCount);
+              // Deduplicate questions by question text
+              const seen = new Set<string>();
+              const uniqueQuestions = parsedQuestions.filter((q: QuizQuestion) => {
+                const norm = q.question.toLowerCase().trim();
+                if (seen.has(norm)) return false;
+                seen.add(norm);
+                return true;
+              });
+              if (uniqueQuestions.length > 0) {
+                return uniqueQuestions.slice(0, questionCount);
+              }
             }
           }
         }
@@ -729,54 +721,439 @@ Instructions:
 
     const tLower = docTitle.toLowerCase().trim();
 
+    // PYTHON LOOPS
+    if (tLower.includes("python loop") || tLower.includes("loop in python")) {
+      return [
+        {
+          id: "q_pyloop_1",
+          question: "Which keyword in Python is used to prematurely exit a loop?",
+          options: ["continue", "break", "pass", "exit"],
+          correctOptionIndex: 1,
+          explanation: "The `break` statement immediately terminates the innermost enclosing loop."
+        },
+        {
+          id: "q_pyloop_2",
+          question: "What does the `range(1, 5)` function generate in Python?",
+          options: [
+            "Numbers: 1, 2, 3, 4, 5",
+            "Numbers: 1, 2, 3, 4",
+            "Numbers: 0, 1, 2, 3, 4",
+            "Numbers: 2, 3, 4, 5"
+          ],
+          correctOptionIndex: 1,
+          explanation: "`range(start, stop)` generates integers from `start` up to, but not including, `stop`."
+        },
+        {
+          id: "q_pyloop_3",
+          question: "What does the `continue` statement do inside a loop in Python?",
+          options: [
+            "Stops the loop completely",
+            "Skips the rest of the current iteration and jumps to the next iteration",
+            "Restarts the loop from index 0",
+            "Throws a runtime exception"
+          ],
+          correctOptionIndex: 1,
+          explanation: "`continue` skips the remaining statements in the current iteration and begins the next loop cycle."
+        },
+        {
+          id: "q_pyloop_4",
+          question: "When is the `else` block attached to a `while` loop executed in Python?",
+          options: [
+            "When the loop condition evaluates to False without a break statement",
+            "Every time an iteration completes",
+            "Only when an exception occurs",
+            "Whenever a break statement is hit"
+          ],
+          correctOptionIndex: 0,
+          explanation: "In Python, a loop's `else` block executes when the loop finishes naturally without encountering `break`."
+        },
+        {
+          id: "q_pyloop_5",
+          question: "Which loop construct is best suited for iterating over elements of a list in Python?",
+          options: ["for item in my_list:", "while my_list:", "do while", "repeat until"],
+          correctOptionIndex: 0,
+          explanation: "Python's `for...in` loop is designed specifically for iterating over sequential iterables like lists."
+        }
+      ].slice(0, questionCount);
+    }
+
+    // PYTHON GENERAL
+    if (tLower.includes("python")) {
+      return [
+        {
+          id: "q_py_1",
+          question: "What is the primary purpose of indentation in Python?",
+          options: [
+            "It is purely cosmetic and ignored by the interpreter",
+            "It defines code blocks and execution scope",
+            "It accelerates bytecode execution speed",
+            "It declares variable data types"
+          ],
+          correctOptionIndex: 1,
+          explanation: "Python uses indentation (whitespace) to delimit structural blocks of code instead of curly braces."
+        },
+        {
+          id: "q_py_2",
+          question: "Which Python data structure is mutable, ordered, and allows duplicate elements?",
+          options: ["Tuple", "List", "Set", "FrozenSet"],
+          correctOptionIndex: 1,
+          explanation: "A `List` in Python is an ordered, mutable sequence that permits duplicate items."
+        },
+        {
+          id: "q_py_3",
+          question: "What is the output of `type([])` in Python?",
+          options: ["<class 'array'>", "<class 'list'>", "<class 'dict'>", "<class 'sequence'>"],
+          correctOptionIndex: 1,
+          explanation: "Empty square brackets `[]` create a Python `list` instance."
+        },
+        {
+          id: "q_py_4",
+          question: "Which keyword is used to define a function in Python?",
+          options: ["function", "def", "func", "lambda_fn"],
+          correctOptionIndex: 1,
+          explanation: "Functions in Python are declared with the `def` keyword."
+        },
+        {
+          id: "q_py_5",
+          question: "Which built-in function returns the total number of items in an iterable?",
+          options: ["size()", "count()", "len()", "length()"],
+          correctOptionIndex: 2,
+          explanation: "`len()` returns the length or number of elements in a sequence/collection."
+        }
+      ].slice(0, questionCount);
+    }
+
+    // REACT
     if (tLower.includes("react")) {
       return [
         {
-          id: "q1",
-          question: "Which React Hook is primarily used for handling side effects like data fetching?",
+          id: "q_react_1",
+          question: "Which React Hook is primarily used for handling side effects like data fetching and subscriptions?",
           options: ["useState", "useEffect", "useContext", "useReducer"],
           correctOptionIndex: 1,
-          explanation: "`useEffect` handles side effects in React functional components."
+          explanation: "`useEffect` manages side effects in React functional components."
         },
         {
-          id: "q2",
+          id: "q_react_2",
           question: "What is the Virtual DOM in React?",
           options: [
-            "A direct copy of the browser HTML document",
+            "A direct copy of the browser's rendered HTML tree",
             "A lightweight in-memory representation of the real DOM",
             "A server-side database engine",
             "A browser extension"
           ],
           correctOptionIndex: 1,
-          explanation: "React uses a virtual DOM to compute diffs efficiently before updating the real DOM."
+          explanation: "React uses an in-memory Virtual DOM to compute differences (diffing) before updating the real DOM."
         },
         {
-          id: "q3",
-          question: "How are attributes passed down from a parent component to a child component in React?",
+          id: "q_react_3",
+          question: "How are attributes and data passed down from a parent component to a child component in React?",
           options: ["State", "Props", "Redux store", "Context API"],
           correctOptionIndex: 1,
-          explanation: "`Props` are used to pass data down from parent to child components."
+          explanation: "`Props` (short for properties) are used to pass data from parent to child components."
         },
         {
-          id: "q4",
+          id: "q_react_4",
           question: "Which Hook would you use to store mutable local component state in React?",
           options: ["useEffect", "useState", "useMemo", "useCallback"],
           correctOptionIndex: 1,
-          explanation: "`useState` creates local state variable pairs in functional React components."
+          explanation: "`useState` declares state variables in functional components."
         },
         {
-          id: "q5",
-          question: "What special prop must be provided when rendering a list of elements in React?",
+          id: "q_react_5",
+          question: "What special prop must be provided to elements when rendering a dynamic list in React?",
           options: ["id", "key", "ref", "index"],
           correctOptionIndex: 1,
-          explanation: "`key` props help React identify which items have changed, been added, or removed."
+          explanation: "`key` props help React identify which items have changed, been added, or removed across re-renders."
         }
       ].slice(0, questionCount);
     }
 
+    // JAVASCRIPT
+    if (tLower.includes("javascript") || tLower === "js") {
+      return [
+        {
+          id: "q_js_1",
+          question: "Which keyword declares a block-scoped variable that cannot be reassigned?",
+          options: ["var", "let", "const", "static"],
+          correctOptionIndex: 2,
+          explanation: "`const` creates a block-scoped read-only reference that cannot be reassigned."
+        },
+        {
+          id: "q_js_2",
+          question: "What is the result of `typeof null` in JavaScript?",
+          options: ["'null'", "'undefined'", "'object'", "'boolean'"],
+          correctOptionIndex: 2,
+          explanation: "Due to a historical design quirk in JavaScript, `typeof null` returns `'object'`."
+        },
+        {
+          id: "q_js_3",
+          question: "Which method parses a JSON string and constructs the corresponding JavaScript object?",
+          options: ["JSON.stringify()", "JSON.parse()", "JSON.toObject()", "Object.fromJSON()"],
+          correctOptionIndex: 1,
+          explanation: "`JSON.parse()` converts a valid JSON string into a JavaScript object."
+        },
+        {
+          id: "q_js_4",
+          question: "What is the key difference between `==` and `===` in JavaScript?",
+          options: [
+            "`==` is for numbers; `===` is for strings",
+            "`==` performs type coercion; `===` checks both value and type equality without coercion",
+            "`===` is deprecated in modern ECMAScript",
+            "There is no difference"
+          ],
+          correctOptionIndex: 1,
+          explanation: "Strict equality (`===`) checks both value and type without converting types implicitly."
+        },
+        {
+          id: "q_js_5",
+          question: "Which Array method adds one or more elements to the end of an array and returns its new length?",
+          options: ["pop()", "push()", "shift()", "unshift()"],
+          correctOptionIndex: 1,
+          explanation: "`push()` appends elements to the end of an array."
+        }
+      ].slice(0, questionCount);
+    }
+
+    // DSA (DATA STRUCTURES & ALGORITHMS)
+    if (tLower.includes("dsa") || tLower.includes("data structure") || tLower.includes("algorithm")) {
+      return [
+        {
+          id: "q_dsa_1",
+          question: "What is the average time complexity of searching an element in a balanced Binary Search Tree (BST)?",
+          options: ["O(1)", "O(log n)", "O(n)", "O(n log n)"],
+          correctOptionIndex: 1,
+          explanation: "In a balanced BST, each comparison halves the search space, resulting in O(log n) time complexity."
+        },
+        {
+          id: "q_dsa_2",
+          question: "Which data structure follows the Last-In, First-Out (LIFO) principle?",
+          options: ["Queue", "Stack", "Linked List", "Priority Queue"],
+          correctOptionIndex: 1,
+          explanation: "A `Stack` operates on LIFO order: the most recently added element is removed first."
+        },
+        {
+          id: "q_dsa_3",
+          question: "What is the worst-case time complexity of QuickSort?",
+          options: ["O(log n)", "O(n)", "O(n log n)", "O(n^2)"],
+          correctOptionIndex: 3,
+          explanation: "QuickSort degrades to O(n^2) when poor pivots are chosen (e.g. consistently smallest/largest in sorted array)."
+        },
+        {
+          id: "q_dsa_4",
+          question: "Which data structure is typically used to implement Breadth-First Search (BFS) on a graph/tree?",
+          options: ["Stack", "Queue", "Max Heap", "Disjoint Set"],
+          correctOptionIndex: 1,
+          explanation: "BFS explores nodes level by level using a First-In, First-Out `Queue`."
+        },
+        {
+          id: "q_dsa_5",
+          question: "What is the time complexity of accessing an element in an array by its index?",
+          options: ["O(1)", "O(log n)", "O(n)", "O(n^2)"],
+          correctOptionIndex: 0,
+          explanation: "Arrays allow O(1) constant-time direct access using base pointer arithmetic."
+        }
+      ].slice(0, questionCount);
+    }
+
+    // BINARY SEARCH
+    if (tLower.includes("binary search")) {
+      return [
+        {
+          id: "q_bs_1",
+          question: "What prerequisite condition is strictly required for Binary Search to function correctly?",
+          options: [
+            "The elements must be unique with no duplicates",
+            "The array/collection must be sorted",
+            "The array size must be a power of 2",
+            "The collection must be a doubly linked list"
+          ],
+          correctOptionIndex: 1,
+          explanation: "Binary Search requires sorted data so it can determine whether to search the left or right partition."
+        },
+        {
+          id: "q_bs_2",
+          question: "What is the worst-case time complexity of Binary Search on an array of N elements?",
+          options: ["O(1)", "O(log N)", "O(N)", "O(N log N)"],
+          correctOptionIndex: 1,
+          explanation: "Binary Search achieves O(log N) logarithmic time by halving the search space each step."
+        },
+        {
+          id: "q_bs_3",
+          question: "In each comparison step of Binary Search, by how much is the search space reduced?",
+          options: ["By 1 element", "By 25%", "By 50% (Halved)", "By 75%"],
+          correctOptionIndex: 2,
+          explanation: "Binary Search discards exactly half the remaining search space after each comparison."
+        },
+        {
+          id: "q_bs_4",
+          question: "When `target > array[mid]` in an ascending sorted array, how should the boundaries be updated?",
+          options: ["right = mid - 1", "left = mid + 1", "left = mid", "right = mid"],
+          correctOptionIndex: 1,
+          explanation: "If the target is greater than the middle element, the target must lie in the right half (`left = mid + 1`)."
+        },
+        {
+          id: "q_bs_5",
+          question: "What is the maximum number of comparisons required to find a target in a sorted array of 1024 elements using Binary Search?",
+          options: ["10", "11", "512", "1024"],
+          correctOptionIndex: 1,
+          explanation: "log2(1024) = 10; with the final boundary check, at most 11 comparisons are performed."
+        }
+      ].slice(0, questionCount);
+    }
+
+    // SQL & DATABASE
+    if (tLower.includes("sql") || tLower.includes("database")) {
+      return [
+        {
+          id: "q_sql_1",
+          question: "Which SQL clause is used to filter groups created by the `GROUP BY` statement?",
+          options: ["WHERE", "HAVING", "FILTER", "ORDER BY"],
+          correctOptionIndex: 1,
+          explanation: "`HAVING` filters aggregated groups, whereas `WHERE` filters individual rows before grouping."
+        },
+        {
+          id: "q_sql_2",
+          question: "What type of relationship does a Foreign Key constraint enforce in a relational database?",
+          options: [
+            "Physical disk encryption",
+            "Referential integrity between related tables",
+            "Automatic index compression",
+            "Thread-safe connection pooling"
+          ],
+          correctOptionIndex: 1,
+          explanation: "Foreign keys enforce referential integrity between primary keys and referencing columns."
+        },
+        {
+          id: "q_sql_3",
+          question: "Which SQL constraint guarantees that all records in a specified column contain distinct values?",
+          options: ["NOT NULL", "UNIQUE", "CHECK", "DEFAULT"],
+          correctOptionIndex: 1,
+          explanation: "The `UNIQUE` constraint ensures that all values in a column are distinct."
+        },
+        {
+          id: "q_sql_4",
+          question: "Which command in SQL removes all rows from a table while keeping the table structure intact?",
+          options: ["DROP TABLE", "TRUNCATE TABLE", "ALTER TABLE", "REMOVE TABLE"],
+          correctOptionIndex: 1,
+          explanation: "`TRUNCATE TABLE` quickly deletes all data rows while retaining the schema structure."
+        },
+        {
+          id: "q_sql_5",
+          question: "What does an `INNER JOIN` return in SQL?",
+          options: [
+            "All records from the left table only",
+            "Records that have matching values in both tables",
+            "All records from both tables regardless of matches",
+            "Only non-matching records"
+          ],
+          correctOptionIndex: 1,
+          explanation: "`INNER JOIN` selects rows where there is a match in both joined tables."
+        }
+      ].slice(0, questionCount);
+    }
+
+    // MONGODB
+    if (tLower.includes("mongodb") || tLower.includes("mongo")) {
+      return [
+        {
+          id: "q_mongo_1",
+          question: "What data format does MongoDB use natively to store documents on disk?",
+          options: ["XML", "BSON (Binary JSON)", "CSV", "YAML"],
+          correctOptionIndex: 1,
+          explanation: "MongoDB stores data records as BSON documents, a binary representation of JSON-like documents."
+        },
+        {
+          id: "q_mongo_2",
+          question: "Which MongoDB method is used to query and retrieve documents from a collection?",
+          options: ["db.collection.select()", "db.collection.find()", "db.collection.get()", "db.collection.fetch()"],
+          correctOptionIndex: 1,
+          explanation: "`find()` queries and returns matching documents from a MongoDB collection."
+        },
+        {
+          id: "q_mongo_3",
+          question: "What field serves as the immutable primary key by default in every MongoDB document?",
+          options: ["id", "_id", "primaryKey", "doc_id"],
+          correctOptionIndex: 1,
+          explanation: "Every MongoDB document requires a unique `_id` field that serves as its primary key."
+        },
+        {
+          id: "q_mongo_4",
+          question: "What is the MongoDB equivalent of a table in relational database systems?",
+          options: ["Document", "Collection", "Schema", "Rowset"],
+          correctOptionIndex: 1,
+          explanation: "In MongoDB, a `Collection` groups related documents, analogously to a SQL table."
+        },
+        {
+          id: "q_mongo_5",
+          question: "Which operator is used in MongoDB to filter documents where a field equals a specific value?",
+          options: ["$eq", "$match", "$is", "$same"],
+          correctOptionIndex: 0,
+          explanation: "The `$eq` comparison operator matches documents where the field equals the specified value."
+        }
+      ].slice(0, questionCount);
+    }
+
+    // OPERATING SYSTEMS
+    if (tLower.includes("operating system") || tLower === "os") {
+      return [
+        {
+          id: "q_os_1",
+          question: "What is the primary difference between a Process and a Thread?",
+          options: [
+            "Processes share memory space; threads have isolated address spaces",
+            "A Process has its own independent address space; threads share the process's memory",
+            "Threads cannot execute concurrently",
+            "Processes run only on GPUs"
+          ],
+          correctOptionIndex: 1,
+          explanation: "A process has its own isolated address space, while threads within the same process share memory."
+        },
+        {
+          id: "q_os_2",
+          question: "Which of the following is NOT one of Coffman's four necessary conditions for deadlock?",
+          options: [
+            "Mutual Exclusion",
+            "Hold and Wait",
+            "Preemptive Scheduling",
+            "Circular Wait"
+          ],
+          correctOptionIndex: 2,
+          explanation: "Deadlock requires No Preemption. Preemptive scheduling prevents deadlocks."
+        },
+        {
+          id: "q_os_3",
+          question: "What is Virtual Memory in modern operating systems?",
+          options: [
+            "Physical RAM chips installed on motherboard",
+            "A memory management technique that creates an illusion of large continuous address space using disk swapping and paging",
+            "A backup cache in the cloud",
+            "Read-Only BIOS firmware"
+          ],
+          correctOptionIndex: 1,
+          explanation: "Virtual Memory maps virtual addresses to physical pages and disk swap to expand usable memory."
+        },
+        {
+          id: "q_os_4",
+          question: "Which CPU scheduling algorithm gives each process a fixed time slice (quantum) in cyclic order?",
+          options: ["First-Come First-Served", "Round Robin", "Shortest Job First", "Priority Scheduling"],
+          correctOptionIndex: 1,
+          explanation: "Round Robin assigns a fixed time quantum to each runnable process in cyclic order."
+        },
+        {
+          id: "q_os_5",
+          question: "What synchronization primitive uses atomic wait() and signal() operations to manage access to shared resources?",
+          options: ["Semaphore", "Thread pool", "File descriptor", "Page table"],
+          correctOptionIndex: 0,
+          explanation: "A Semaphore is a synchronization variable manipulated via atomic wait (`P`) and signal (`V`) primitives."
+        }
+      ].slice(0, questionCount);
+    }
+
+    // GENERIC FALLBACK FOR ANY OTHER TOPIC
     return [
       {
-        id: "q1",
+        id: "q_gen_1",
         question: `What is the primary core objective of ${docTitle}?`,
         options: [
           `To structure logic and solve problems efficiently within ${docTitle}`,
@@ -788,7 +1165,7 @@ Instructions:
         explanation: `${docTitle} provides foundational principles for structuring solutions.`
       },
       {
-        id: "q2",
+        id: "q_gen_2",
         question: `Which fundamental principle governs ${docTitle}?`,
         options: [
           "Unconstrained memory allocation",
@@ -800,7 +1177,7 @@ Instructions:
         explanation: `${docTitle} relies on systematic evaluation and structured design patterns.`
       },
       {
-        id: "q3",
+        id: "q_gen_3",
         question: `What is a key practical benefit of applying ${docTitle} correctly?`,
         options: [
           "Increased manual overhead",
@@ -810,6 +1187,30 @@ Instructions:
         ],
         correctOptionIndex: 1,
         explanation: `Proper application of ${docTitle} ensures system reliability and maintainable architecture.`
+      },
+      {
+        id: "q_gen_4",
+        question: `How does ${docTitle} manage complex execution workflows?`,
+        options: [
+          "By discarding intermediate verification",
+          `By breaking down tasks into modular, verifiable steps`,
+          "By avoiding all structured state management",
+          "By forcing synchronous blocking on all operations"
+        ],
+        correctOptionIndex: 1,
+        explanation: `${docTitle} isolates subcomponents to maintain clear lifecycle control.`
+      },
+      {
+        id: "q_gen_5",
+        question: `Which metric is commonly evaluated when benchmarking ${docTitle}?`,
+        options: [
+          "Execution predictability and efficiency",
+          "Arbitrary syntax complexity",
+          "Number of manual restarts required",
+          "Frequency of memory overflow"
+        ],
+        correctOptionIndex: 0,
+        explanation: `Reliable implementations of ${docTitle} optimize execution predictability and computational efficiency.`
       }
     ].slice(0, questionCount);
   }
@@ -818,13 +1219,14 @@ Instructions:
   private static parseUserOptionIndex(query: string, currentQuestion: QuizQuestion): number | null {
     const qLower = query.toLowerCase().trim();
 
-    if (qLower === "a" || qLower.startsWith("a.") || qLower.includes("q1-a") || qLower.includes("q2-a") || qLower.includes("q3-a") || qLower.endsWith("-a") || qLower === "option a") return 0;
-    if (qLower === "b" || qLower.startsWith("b.") || qLower.includes("q1-b") || qLower.includes("q2-b") || qLower.includes("q3-b") || qLower.endsWith("-b") || qLower === "option b") return 1;
-    if (qLower === "c" || qLower.startsWith("c.") || qLower.includes("q1-c") || qLower.includes("q2-c") || qLower.includes("q3-c") || qLower.endsWith("-c") || qLower === "option c") return 2;
-    if (qLower === "d" || qLower.startsWith("d.") || qLower.includes("q1-d") || qLower.includes("q2-d") || qLower.includes("q3-d") || qLower.endsWith("-d") || qLower === "option d") return 3;
+    if (qLower === "a" || qLower.startsWith("a.") || qLower.startsWith("a)") || qLower.includes("q1-a") || qLower.includes("q2-a") || qLower.includes("q3-a") || qLower.endsWith("-a") || qLower === "option a" || qLower === "opt a") return 0;
+    if (qLower === "b" || qLower.startsWith("b.") || qLower.startsWith("b)") || qLower.includes("q1-b") || qLower.includes("q2-b") || qLower.includes("q3-b") || qLower.endsWith("-b") || qLower === "option b" || qLower === "opt b") return 1;
+    if (qLower === "c" || qLower.startsWith("c.") || qLower.startsWith("c)") || qLower.includes("q1-c") || qLower.includes("q2-c") || qLower.includes("q3-c") || qLower.endsWith("-c") || qLower === "option c" || qLower === "opt c") return 2;
+    if (qLower === "d" || qLower.startsWith("d.") || qLower.startsWith("d)") || qLower.includes("q1-d") || qLower.includes("q2-d") || qLower.includes("q3-d") || qLower.endsWith("-d") || qLower === "option d" || qLower === "opt d") return 3;
 
     for (let i = 0; i < currentQuestion.options.length; i++) {
-      if (qLower.includes(currentQuestion.options[i].toLowerCase())) {
+      const optText = currentQuestion.options[i].toLowerCase();
+      if (qLower.includes(optText) || optText.includes(qLower)) {
         return i;
       }
     }
@@ -855,12 +1257,18 @@ Instructions:
       }
     }
 
-    // 2. State Recovery from Conversation History (if session lost or cold start)
-    if (!session.currentTopic && conversationHistory && conversationHistory.length > 0) {
+    // 2. PRIORITY #1: Detect explicit topic from current query (LATEST EXPLICIT TOPIC ALWAYS OVERRIDES OLD TOPIC!)
+    const explicitTopic = this.extractExplicitTopic(query);
+
+    if (explicitTopic) {
+      session.currentTopic = explicitTopic;
+      session.currentConcept = explicitTopic;
+    } else if (!session.currentTopic && conversationHistory && conversationHistory.length > 0) {
+      // Fallback state recovery from history only if session has no topic
       for (let i = conversationHistory.length - 1; i >= 0; i--) {
         const msg = conversationHistory[i];
         if (msg.sender === "user") {
-          const detectedTopic = this.detectExplicitTopicFromQuery(msg.content);
+          const detectedTopic = this.extractExplicitTopic(msg.content);
           if (detectedTopic) {
             session.currentTopic = detectedTopic;
             session.currentConcept = detectedTopic;
@@ -870,37 +1278,115 @@ Instructions:
       }
     }
 
-    // 3. Quiz Me Mode Routing
-    if (mode === "Quiz Me" || qLower.startsWith("quiz me")) {
-      const topic = session.currentTopic || this.detectExplicitTopicFromQuery(query) || "Python";
-      const questions = await this.generateQuizFromDocument(topic, 5, "Medium");
-      
-      const newActiveQuiz: ActiveQuizState = {
-        status: "active",
-        topic,
-        questions,
-        currentQuestionIndex: 0,
-        score: 0
-      };
+    // 3. QUIZ ME MODE OR EXPLICIT QUIZ COMMAND HANDLING
+    const isQuizMode =
+      mode === "Quiz Me" ||
+      qLower.startsWith("quiz me") ||
+      qLower.includes("quiz") ||
+      qLower.startsWith("test me on");
 
-      serverState.updateTutoringSessionState(conversationId, {
-        activeQuiz: newActiveQuiz,
-        currentTopic: topic,
-        currentConcept: topic
-      });
+    if (isQuizMode) {
+      const targetTopic = explicitTopic || session.currentTopic || "Python";
+      const hasActiveQuiz = session.activeQuiz && session.activeQuiz.status === "active";
+      const isTopicSwitch = Boolean(
+        explicitTopic &&
+        hasActiveQuiz &&
+        session.activeQuiz!.topic.toLowerCase() !== explicitTopic.toLowerCase()
+      );
+      const isNewQuizRequest = !hasActiveQuiz || isTopicSwitch || qLower.startsWith("quiz me") || qLower.startsWith("topic");
 
-      const q1 = questions[0];
-      const quizIntro = `Here is Question 1 of ${questions.length} on **${topic}**:\n\n` +
-        `**Question 1**: ${q1.question}\n` +
-        q1.options.map((opt, oIdx) => `   ${String.fromCharCode(65 + oIdx)}. ${opt}`).join("\n") +
-        `\n\nReply with your answer (A, B, C, or D).`;
+      // CASE 3A: START NEW QUIZ OR SWITCH TOPIC (RESET PREVIOUS QUIZ STATE)
+      if (isNewQuizRequest) {
+        const questions = await this.generateQuizFromDocument(targetTopic, 5, "Medium");
 
-      return { responseText: quizIntro };
+        const newActiveQuiz: ActiveQuizState = {
+          status: "active",
+          topic: targetTopic,
+          questions,
+          currentQuestionIndex: 0,
+          score: 0
+        };
+
+        serverState.updateTutoringSessionState(conversationId, {
+          activeQuiz: newActiveQuiz,
+          currentTopic: targetTopic,
+          currentConcept: targetTopic,
+          tutorState: "WAITING_FOR_KNOWLEDGE_ANSWER",
+          pendingQuestion: questions[0].question,
+          pendingQuestionType: "KNOWLEDGE_CHECK",
+          retryCount: 0
+        });
+
+        const q1 = questions[0];
+        const quizIntro = `Here is Question 1 of ${questions.length} on **${targetTopic}**:\n\n` +
+          `**Question 1**: ${q1.question}\n` +
+          q1.options.map((opt, oIdx) => `   ${String.fromCharCode(65 + oIdx)}. ${opt}`).join("\n") +
+          `\n\nReply with your answer (A, B, C, or D).`;
+
+        return { responseText: quizIntro };
+      }
+
+      // CASE 3B: USER IS ANSWERING CURRENT ACTIVE QUIZ QUESTION
+      const activeQuiz = session.activeQuiz!;
+      const currentQ = activeQuiz.questions[activeQuiz.currentQuestionIndex];
+      const userOptionIdx = this.parseUserOptionIndex(query, currentQ);
+
+      if (userOptionIdx !== null) {
+        const isCorrect = userOptionIdx === currentQ.correctOptionIndex;
+        if (isCorrect) {
+          activeQuiz.score += 1;
+        }
+
+        const correctOptionLetter = String.fromCharCode(65 + currentQ.correctOptionIndex);
+        const correctOptionText = currentQ.options[currentQ.correctOptionIndex];
+
+        const evalFeedback = isCorrect
+          ? `✅ That's correct! ${currentQ.explanation}`
+          : `❌ That is incorrect. The correct answer was **${correctOptionLetter}. ${correctOptionText}**.\n\n${currentQ.explanation}`;
+
+        const nextIdx = activeQuiz.currentQuestionIndex + 1;
+        activeQuiz.currentQuestionIndex = nextIdx;
+
+        if (nextIdx < activeQuiz.questions.length) {
+          const nextQ = activeQuiz.questions[nextIdx];
+          serverState.updateTutoringSessionState(conversationId, {
+            activeQuiz,
+            currentTopic: activeQuiz.topic,
+            currentConcept: activeQuiz.topic,
+            pendingQuestion: nextQ.question
+          });
+
+          const nextPrompt = `${evalFeedback}\n\n---\n\n` +
+            `Here is Question ${nextIdx + 1} of ${activeQuiz.questions.length} on **${activeQuiz.topic}**:\n\n` +
+            `**Question ${nextIdx + 1}**: ${nextQ.question}\n` +
+            nextQ.options.map((opt, oIdx) => `   ${String.fromCharCode(65 + oIdx)}. ${opt}`).join("\n") +
+            `\n\nReply with your answer (A, B, C, or D).`;
+
+          return { responseText: nextPrompt };
+        } else {
+          // QUIZ COMPLETED
+          activeQuiz.status = "completed";
+          serverState.updateTutoringSessionState(conversationId, {
+            activeQuiz,
+            currentTopic: activeQuiz.topic,
+            tutorState: "SESSION_COMPLETE",
+            pendingQuestion: null
+          });
+
+          const finalScorePercent = Math.round((activeQuiz.score / activeQuiz.questions.length) * 100);
+          const completionPrompt = `${evalFeedback}\n\n---\n\n` +
+            `🎉 **Quiz Completed on ${activeQuiz.topic}!**\n` +
+            `**Final Score**: ${activeQuiz.score} / ${activeQuiz.questions.length} (${finalScorePercent}%)\n\n` +
+            `Great effort! Would you like to review this topic further, or try a quiz on another topic? (e.g., 'topic - JavaScript' or 'Explain Python Loops')`;
+
+          return { responseText: completionPrompt };
+        }
+      }
     }
 
-    // 4. Give Example Mode Routing
+    // 4. GIVE EXAMPLE MODE ROUTING
     if (mode === "Give Example" || this.isFollowUpExample(qLower)) {
-      const topic = session.currentTopic || this.detectExplicitTopicFromQuery(query) || "React";
+      const topic = explicitTopic || session.currentTopic || "React";
       serverState.updateTutoringSessionState(conversationId, {
         currentTopic: topic,
         currentConcept: topic,
@@ -912,7 +1398,7 @@ Instructions:
       return { responseText: formatted };
     }
 
-    // 5. Intent Classification against Session State
+    // 5. INTENT CLASSIFICATION FOR TUTORING FLOW
     const intentResult = this.classifyIntent(query, session, conversationHistory);
 
     let rawResponse = "";
@@ -929,10 +1415,7 @@ Instructions:
         retryCount: 0
       });
 
-      const ackIntro = persona === "professional"
-        ? "Great! Let's quickly check your understanding."
-        : "Great! Let's quickly check your understanding.";
-
+      const ackIntro = "Great! Let's quickly check your understanding.";
       rawResponse = `${ackIntro}\n\n${conceptQuestion}`;
     }
 
@@ -973,7 +1456,7 @@ Instructions:
       rawResponse = `${explanation}\n\nDoes that make sense? Are you comfortable with this concept?`;
     }
 
-    // CASE E: USER SUBMITS KNOWLEDGE ANSWER (Evaluating understanding)
+    // CASE E: USER SUBMITS KNOWLEDGE ANSWER (Evaluating understanding in Explain mode)
     else if (intentResult.intent === "KNOWLEDGE_ANSWER") {
       const activeTopic = session.currentTopic || "React";
       const activeQuestion = session.pendingQuestion || this.generateConceptCheckQuestion(activeTopic, persona === "professional" ? "professional" : "friendly");
@@ -999,8 +1482,8 @@ Instructions:
     }
 
     // CASE F: EXPLICIT NEW TOPIC REQUEST (e.g. "Explain React", "What is Python", "Teach me DSA")
-    else if (intentResult.intent === "EXPLICIT_NEW_TOPIC" && intentResult.topic) {
-      const topic = intentResult.topic;
+    else if (intentResult.intent === "EXPLICIT_NEW_TOPIC" && (intentResult.topic || explicitTopic)) {
+      const topic = intentResult.topic || explicitTopic || "React";
       const explanation = this.getFactualDefinition(topic, persona === "professional" ? "professional" : "friendly");
 
       serverState.updateTutoringSessionState(conversationId, {
@@ -1030,7 +1513,6 @@ Instructions:
     // CASE H: CASUAL / FALLBACK
     else {
       if (session.currentTopic) {
-        // If an active topic is open, continue with the check
         rawResponse = `Let's focus on **${session.currentTopic}**.\n\nDoes the explanation make sense, or would you like to check your understanding with a quick question?`;
       } else {
         rawResponse = persona === "professional"
