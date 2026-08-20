@@ -70,7 +70,7 @@ export const FREE_PLAN = {
 
 // ── Default starting credits for new users ────────────────────────────────────
 
-export const NEW_USER_FREE_CREDITS = 200;
+export const NEW_USER_FREE_CREDITS = 100;
 
 // ── Credits granted when a plan is purchased ─────────────────────────────────
 

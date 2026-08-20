@@ -2,21 +2,22 @@ import { NextResponse } from "next/server";
 import { AuthService } from "@/lib/services/auth-service";
 import { getDb } from "@/lib/db/mongodb";
 import { UserDoc, DocumentDoc, QuizAttemptDoc, ChallengeAttemptDoc, StudyPlanDoc } from "@/lib/db/models";
+import { NEW_USER_FREE_CREDITS } from "@/lib/config/pricing";
 
 export async function GET(request: Request) {
   try {
-    const userId = AuthService.getUserIdFromRequest(request);
+    const userId = await AuthService.getUserIdFromRequest(request);
     const db = await getDb();
 
     if (db) {
-      const user = (await db.collection("users").findOne({ userId })) as UserDoc | null;
+      const user = (await db.collection("users").findOne({ clerkUserId: userId })) as UserDoc | null;
       const recentDocs = (await db.collection("documents").find({ userId }).sort({ date: -1 }).limit(3).toArray()) as DocumentDoc[];
       const recentQuizzes = (await db.collection("quiz_attempts").find({ userId }).sort({ date: -1 }).limit(3).toArray()) as QuizAttemptDoc[];
       const challenges = (await db.collection("challenge_attempts").find({ userId }).toArray()) as ChallengeAttemptDoc[];
       const studyPlan = (await db.collection("study_plans").findOne({ userId })) as StudyPlanDoc | null;
 
       const name = user?.name || "Swati Kumari";
-      const credits = user?.credits ?? 420;
+      const credits = user?.credits ?? NEW_USER_FREE_CREDITS;
       const totalXP = challenges.reduce((sum: number, c: ChallengeAttemptDoc) => sum + (c.xpEarned || 0), 1250);
       const streak = recentQuizzes.length > 0 ? 5 : 0;
 
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       userName: "Swati Kumari",
-      credits: 420,
+      credits: NEW_USER_FREE_CREDITS,
       plan: "free",
       hasActivity: true,
       streak: 5,

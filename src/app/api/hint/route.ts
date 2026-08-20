@@ -16,12 +16,12 @@ export async function POST(req: NextRequest) {
 
     const db = await getDb();
     if (db) {
-      const user = (await db.collection("users").findOne({ userId })) as UserDoc | null;
-      const credits = user?.credits ?? 420;
+      const user = (await db.collection("users").findOne({ clerkUserId: userId })) as UserDoc | null;
+      const credits = user?.credits ?? 100;
       if (credits < 5) {
         return NextResponse.json({ error: "Insufficient credits for AI hint." }, { status: 403 });
       }
-      await db.collection("users").updateOne({ userId }, { $inc: { credits: -5 } });
+      await db.collection("users").updateOne({ clerkUserId: userId }, { $inc: { credits: -5 } });
     }
 
     const hintText = await GeminiAIService.generateHint(question, options);

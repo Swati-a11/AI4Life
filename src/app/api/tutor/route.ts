@@ -21,8 +21,8 @@ export async function POST(req: NextRequest) {
     // Deduct credits if DB is available
     const db = await getDb();
     if (db) {
-      const user = (await db.collection("users").findOne({ userId })) as UserDoc | null;
-      const currentCredits = user?.credits ?? 420;
+      const user = (await db.collection("users").findOne({ clerkUserId: userId })) as UserDoc | null;
+      const currentCredits = user?.credits ?? 100;
       if (currentCredits < 10) {
         return NextResponse.json(
           { error: "Insufficient credits. Please upgrade your plan or purchase additional credits." },
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      await db.collection("users").updateOne({ userId }, { $inc: { credits: -10 } });
+      await db.collection("users").updateOne({ clerkUserId: userId }, { $inc: { credits: -10 } });
     }
 
     // Save student user message

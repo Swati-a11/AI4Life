@@ -3,6 +3,7 @@ import { AuthService } from "@/lib/services/auth-service";
 import { UserService } from "@/lib/services/user-service";
 import { getDb } from "@/lib/db/mongodb";
 import { UserDoc } from "@/lib/db/models";
+import { NEW_USER_FREE_CREDITS } from "@/lib/config/pricing";
 
 export async function POST(request: Request) {
   try {
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
             clerkUserId: user.clerkUserId,
             name: user.name,
             email: user.email,
-            credits: user.credits || 420,
+            credits: user.credits !== undefined ? user.credits : NEW_USER_FREE_CREDITS,
             plan: user.plan || "free",
             subscriptionStatus: user.subscriptionStatus || "inactive",
           },
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
         clerkUserId,
         name: "Swati Kumari",
         email: "swati@student.ai4life.com",
-        credits: 420,
+        credits: NEW_USER_FREE_CREDITS,
         plan: "free",
         subscriptionStatus: "inactive",
       },

@@ -34,10 +34,11 @@ interface StudentShellProps {
 }
 
 export function StudentShell({ currentTab, onTabChange, children }: StudentShellProps) {
-  const [credits, setCredits] = useState<number>(200);
+  const [credits, setCredits] = useState<number>(100);
   const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -53,6 +54,26 @@ export function StudentShell({ currentTab, onTabChange, children }: StudentShell
     const currentCredits = CreditService.getCredits(userId);
     setCredits(currentCredits);
 
+    const handleCreditsUpdated = (e: any) => {
+      if (e.detail && e.detail.credits !== undefined) {
+        setCredits(e.detail.credits);
+      }
+    };
+
+    const handleCreditDeducted = (e: any) => {
+      if (e.detail && e.detail.remainingCredits !== undefined) {
+        setCredits(e.detail.remainingCredits);
+        const cost = e.detail.cost || 20;
+        setToastMessage(`${cost} credits used · ${e.detail.remainingCredits} credits remaining`);
+        setTimeout(() => {
+          setToastMessage((prev) => (prev?.includes(`${e.detail.remainingCredits}`) ? null : prev));
+        }, 4000);
+      }
+    };
+
+    window.addEventListener("ai4life:credits-updated", handleCreditsUpdated);
+    window.addEventListener("ai4life:credit-deducted", handleCreditDeducted);
+
     fetch("/api/auth", {
       headers: { "x-user-id": userId }
     })
@@ -64,6 +85,11 @@ export function StudentShell({ currentTab, onTabChange, children }: StudentShell
         }
       })
       .catch(console.error);
+
+    return () => {
+      window.removeEventListener("ai4life:credits-updated", handleCreditsUpdated);
+      window.removeEventListener("ai4life:credit-deducted", handleCreditDeducted);
+    };
   }, []);
 
   const handleSearch = async (q: string) => {
@@ -178,7 +204,7 @@ export function StudentShell({ currentTab, onTabChange, children }: StudentShell
           {/* Credit Pill */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300">
             <Zap className="w-3.5 h-3.5 fill-current text-amber-500" />
-            <span className="text-xs font-black">{isMounted ? credits : 420}</span>
+            <span className="text-xs font-black">{isMounted ? credits : 100}</span>
             <button
               onClick={() => setIsUpgradeOpen(true)}
               className="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500 text-white hover:bg-amber-600 transition-colors cursor-pointer"
@@ -191,6 +217,23 @@ export function StudentShell({ currentTab, onTabChange, children }: StudentShell
         </div>
 
       </header>
+
+      {/* Floating Credit Notification Toast */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+          >
+            <div className="px-4 py-2.5 rounded-2xl bg-slate-900/90 dark:bg-slate-100/90 text-white dark:text-slate-900 border border-slate-700/50 dark:border-slate-300 shadow-2xl backdrop-blur-md flex items-center gap-2.5 text-xs font-bold">
+              <Zap className="w-4 h-4 text-amber-400 dark:text-amber-600 fill-current shrink-0 animate-bounce" />
+              <span>{toastMessage}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Workspace Body */}
       <div className="flex-1 flex max-w-7xl w-full mx-auto">

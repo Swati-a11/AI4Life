@@ -21,6 +21,7 @@ import {
   Target
 } from "lucide-react";
 import { StudyGoal, PlannerTask, UserStudyPlan } from "@/lib/services/server-store";
+import { CreditService } from "@/lib/services/credit-service";
 
 interface StudyPlannerViewProps {
   onDeductCredits?: (cost: number) => boolean;
@@ -30,6 +31,7 @@ export function StudyPlannerView({ onDeductCredits }: StudyPlannerViewProps) {
   const [plan, setPlan] = useState<UserStudyPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Onboarding Step 1: Goals
   const [goals, setGoals] = useState<StudyGoal[]>([
@@ -61,10 +63,7 @@ export function StudyPlannerView({ onDeductCredits }: StudyPlannerViewProps) {
       .then((data) => {
         if (data.success && data.plan) {
           setPlan(data.plan);
-          if (data.plan.availableDailyHours) {
-            setAvailableDailyHours(data.plan.availableDailyHours);
-            setRebalanceHours(data.plan.availableDailyHours);
-          }
+          setRebalanceHours(data.plan.availableDailyHours || 4);
         } else {
           setPlan(null);
         }
@@ -91,7 +90,17 @@ export function StudyPlannerView({ onDeductCredits }: StudyPlannerViewProps) {
 
   const handleGeneratePlan = async () => {
     if (goals.length === 0) return;
+    setErrorMessage(null);
+
+    const currentCredits = CreditService.getCredits();
+    if (currentCredits < 20) {
+      setErrorMessage("Insufficient credits. You need at least 20 credits to generate a study plan.");
+      if (onDeductCredits) onDeductCredits(20);
+      return;
+    }
+
     setIsGenerating(true);
+    const idempotencyKey = `plan_${Date.now()}`;
 
     try {
       const res = await fetch("/api/planner", {
@@ -101,7 +110,8 @@ export function StudyPlannerView({ onDeductCredits }: StudyPlannerViewProps) {
           action: "generate",
           goals,
           availableDailyHours,
-          dateRange
+          dateRange,
+          idempotencyKey
         })
       });
 
@@ -109,9 +119,18 @@ export function StudyPlannerView({ onDeductCredits }: StudyPlannerViewProps) {
       if (data.success && data.plan) {
         setPlan(data.plan);
         setRebalanceHours(data.plan.availableDailyHours);
+        if (data.creditsRemaining !== undefined) {
+          CreditService.notifyCreditDeduction(20, data.creditsRemaining);
+        }
+      } else {
+        setErrorMessage(data.error || "Insufficient credits.");
+        if (data.errorCode === "INSUFFICIENT_CREDITS" && onDeductCredits) {
+          onDeductCredits(20);
+        }
       }
     } catch (err) {
       console.error("Generate plan error:", err);
+      setErrorMessage("Failed to generate plan. Please try again.");
     } finally {
       setIsGenerating(false);
     }
@@ -383,6 +402,21 @@ export function StudyPlannerView({ onDeductCredits }: StudyPlannerViewProps) {
               </div>
             </div>
 
+            {errorMessage && (
+              <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center justify-between">
+                <span>{errorMessage}</span>
+                {onDeductCredits && (
+                  <button
+                    onClick={() => onDeductCredits(20)}
+                    className="underline text-[11px] font-black cursor-pointer ml-2"
+                    type="button"
+                  >
+                    Upgrade Plan
+                  </button>
+                )}
+              </div>
+            )}
+
             <button
               onClick={handleGeneratePlan}
               disabled={isGenerating || goals.length === 0}
@@ -390,7 +424,7 @@ export function StudyPlannerView({ onDeductCredits }: StudyPlannerViewProps) {
               type="button"
             >
               <Sparkles className="w-4 h-4 fill-current" />
-              <span>{isGenerating ? "AI is Building Your Schedule..." : `Generate AI Schedule (${availableDailyHours} Hours/Day)`}</span>
+              <span>{isGenerating ? "AI is Building Your Schedule..." : `Generate AI Schedule (${availableDailyHours} Hours/Day) • 20 Credits`}</span>
             </button>
           </div>
         </div>

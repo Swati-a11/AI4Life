@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     // 1. ACTION: START CHALLENGE & DEDUCT 20 CREDITS SERVER-SIDE WITH IDEMPOTENCY
     if (action === "start") {
       const idKey = challengeId || `ch_${Date.now()}`;
-      const deduction = CreditService.deductCredits(
+      const deduction = await CreditService.deductCreditsAsync(
         20,
         userId,
         idKey,
@@ -31,7 +31,8 @@ export async function POST(req: NextRequest) {
           {
             success: false,
             errorCode: "INSUFFICIENT_CREDITS",
-            error: "AI Se Baazi requires 20 credits."
+            error: "Insufficient credits.",
+            creditsRemaining: deduction.remainingCredits
           },
           { status: 400 }
         );
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
         success: true,
         challengeId: idKey,
         creditsRemaining: deduction.remainingCredits,
+        creditsUsed: 20,
         alreadyDeducted: deduction.alreadyProcessed || false,
         lastAttempt
       });
@@ -107,14 +109,8 @@ export async function POST(req: NextRequest) {
         judgeSummary = `You outperformed AI overall (${humanOverall}% vs ${aiOverall}%)! Your practical explanation and real-world application gave you the edge over general knowledge.`;
       }
 
-      // Award +20 credits completion reward server-side
       const idKey = challengeId || `ch_res_${Date.now()}`;
-      const reward = CreditService.addCredits(
-        20,
-        userId,
-        idKey,
-        `AI Se Baazi Battle Reward — ${topic}`
-      );
+      const currentCredits = CreditService.getCredits(userId);
 
       const battleResult: BaaziBattleResult = {
         id: idKey,
@@ -142,7 +138,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         result: battleResult,
-        creditsRemaining: reward.remainingCredits
+        creditsRemaining: currentCredits
       });
     }
 

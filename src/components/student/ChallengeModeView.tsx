@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { BaaziBattleResult } from "@/lib/services/server-store";
 import { loadMaterialsFromCache, getMaterialFromCache } from "@/lib/utils/materials-cache";
+import { CreditService } from "@/lib/services/credit-service";
 
 interface ChallengeModeViewProps {
   onDeductCredits?: (cost: number) => boolean;
@@ -155,7 +156,7 @@ function RadarChart({
 }
 
 export function ChallengeModeView({ onDeductCredits }: ChallengeModeViewProps) {
-  const [userCredits, setUserCredits] = useState(200);
+  const [userCredits, setUserCredits] = useState(100);
   const [topicInput, setTopicInput] = useState("React");
   const [battleMode, setBattleMode] = useState<"general" | "material">("general");
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>("");
@@ -176,6 +177,17 @@ export function ChallengeModeView({ onDeductCredits }: ChallengeModeViewProps) {
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
+    const current = CreditService.getCredits();
+    setUserCredits(current);
+
+    const handleCreditsUpdated = (e: any) => {
+      if (e.detail && e.detail.credits !== undefined) {
+        setUserCredits(e.detail.credits);
+      }
+    };
+
+    window.addEventListener("ai4life:credits-updated", handleCreditsUpdated);
+
     fetch("/api/auth")
       .then((res) => res.json())
       .then((data) => {
@@ -193,12 +205,17 @@ export function ChallengeModeView({ onDeductCredits }: ChallengeModeViewProps) {
     } catch (e) {
       console.error("ChallengeModeView cache load error:", e);
     }
+
+    return () => {
+      window.removeEventListener("ai4life:credits-updated", handleCreditsUpdated);
+    };
   }, []);
 
   const handleOpenConfirmation = () => {
     setErrorText(null);
     if (userCredits < 20) {
-      setErrorText("AI Se Baazi requires 20 credits.");
+      setErrorText("Insufficient credits. AI Se Baazi requires 20 credits.");
+      if (onDeductCredits) onDeductCredits(20);
       return;
     }
     setGameState("CREDIT_CONFIRMATION");
@@ -226,6 +243,7 @@ export function ChallengeModeView({ onDeductCredits }: ChallengeModeViewProps) {
       if (data.success) {
         if (data.creditsRemaining !== undefined) {
           setUserCredits(data.creditsRemaining);
+          CreditService.notifyCreditDeduction(20, data.creditsRemaining);
         }
         setGameState("EXPLAIN_IT_BACK");
         setResponseStartTime(Date.now());

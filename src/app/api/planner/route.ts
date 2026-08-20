@@ -22,7 +22,17 @@ export async function POST(req: NextRequest) {
   try {
     const userId = await AuthService.getUserIdFromRequest(req);
     const body = await req.json();
-    const { action, goals, availableDailyHours = 4, dateRange = "Today", taskId, status, targetDate, newDailyHours } = body;
+    const {
+      action,
+      goals,
+      availableDailyHours = 4,
+      dateRange = "Today",
+      taskId,
+      status,
+      targetDate,
+      newDailyHours,
+      idempotencyKey
+    } = body;
 
     // ACTION 1: UPDATE TASK STATUS (e.g. Completed, Rescheduled, Skipped)
     if (action === "update_task" && taskId && status) {
@@ -44,14 +54,15 @@ export async function POST(req: NextRequest) {
     }
 
     // ACTION 3: GENERATE FRESH REALISTIC STUDY PLAN
-    const idKey = `plan_${Date.now()}`;
-    const deduction = CreditService.deductCredits(20, userId, idKey, "Study Plan Generation");
-    if (!deduction.success) {
+    // 1. Check if user has sufficient credits before executing generation
+    const currentCredits = CreditService.getCredits(userId);
+    if (currentCredits < 20) {
       return NextResponse.json(
         {
           success: false,
           errorCode: "INSUFFICIENT_CREDITS",
-          error: "You need 20 credits to generate a study plan."
+          error: "Insufficient credits.",
+          creditsRemaining: currentCredits
         },
         { status: 400 }
       );
@@ -150,11 +161,29 @@ export async function POST(req: NextRequest) {
       updatedAt: new Date().toISOString()
     };
 
+    // 2. Only after successful plan generation, atomically deduct 20 credits
+    const idKey = idempotencyKey || `plan_${Date.now()}`;
+    const deduction = await CreditService.deductCreditsAsync(20, userId, idKey, "Study Plan Generation");
+    if (!deduction.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          errorCode: "INSUFFICIENT_CREDITS",
+          error: "Insufficient credits.",
+          creditsRemaining: deduction.remainingCredits
+        },
+        { status: 400 }
+      );
+    }
+
     const savedPlan = serverState.saveUserStudyPlan(userId, newPlan);
 
     return NextResponse.json({
       success: true,
-      plan: savedPlan
+      plan: savedPlan,
+      creditsRemaining: deduction.remainingCredits,
+      creditsUsed: 20,
+      alreadyDeducted: deduction.alreadyProcessed || false
     });
   } catch (error) {
     console.error("Error generating study plan:", error);
