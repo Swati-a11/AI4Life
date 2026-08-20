@@ -54,13 +54,23 @@ export function Navbar() {
             : "bg-slate-900/5 dark:bg-white/5 border-slate-900/10 dark:border-white/10"
         }`}>
           {navLinks.map((link) => (
-            <a
-              key={link.name}
-              href={link.href}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white/80 dark:hover:bg-slate-800/80 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-            >
-              {link.name}
-            </a>
+            link.name === "Student Workspace" ? (
+              <Link
+                key={link.name}
+                href={link.href}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white/80 dark:hover:bg-slate-800/80 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                {link.name}
+              </Link>
+            ) : (
+              <a
+                key={link.name}
+                href={link.href}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white/80 dark:hover:bg-slate-800/80 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                {link.name}
+              </a>
+            )
           ))}
         </nav>
 
