@@ -127,7 +127,10 @@ export function AskFromNotesView({ onDeductCredits }: AskFromNotesViewProps) {
           "x-user-id": userId
         },
         body: JSON.stringify({
-          query: materialQuestion
+          query: materialQuestion,
+          // Send cached content so server can answer even without Lambda memory
+          materialContent: selectedMaterial.extractedText || "",
+          materialTitle: selectedMaterial.title || ""
         })
       });
 
