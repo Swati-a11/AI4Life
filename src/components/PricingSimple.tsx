@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { ArrowRight, Zap, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight, Zap, Loader2, X, CreditCard, AlertCircle } from "lucide-react";
 import { PLANS, FREE_PLAN } from "@/lib/config/pricing";
 
 declare global {
@@ -53,6 +53,7 @@ export function PricingSimple() {
   const [creditUsage, setCreditUsage] = useState(620);
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");
+  const [noKeyDialogPlan, setNoKeyDialogPlan] = useState<{ name: string; price: string } | null>(null);
 
   useEffect(() => {
     return () => {
@@ -77,7 +78,7 @@ export function PricingSimple() {
     setPaymentState("creating_order");
 
     try {
-      // 0. Early key check — skip Razorpay entirely if no real key configured
+      // 0. Early key check — show dialog if no real key configured
       const envKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "";
       const isRealKey = Boolean(
         envKeyId &&
@@ -88,15 +89,10 @@ export function PricingSimple() {
       );
 
       if (!isRealKey) {
-        // No real Razorpay key — simulate order creation and success
-        console.info("[Razorpay] No real key configured — running payment simulation");
-        await verifyAndComplete(
-          `order_sim_${Date.now()}`,
-          `pay_sim_${Date.now()}`,
-          "sig_simulated",
-          planId,
-          priceAmount
-        );
+        // No real Razorpay key — show configure dialog, do NOT redirect
+        setProcessingPlan(null);
+        setPaymentState("idle");
+        setNoKeyDialogPlan({ name: planName, price: `₹${priceAmount}` });
         return;
       }
 
@@ -381,6 +377,79 @@ export function PricingSimple() {
         </div>
 
       </div>
+
+      {/* Razorpay Not Configured Dialog */}
+      <AnimatePresence>
+        {noKeyDialogPlan && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+            onClick={() => setNoKeyDialogPlan(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 p-7 shadow-2xl space-y-5 relative"
+            >
+              <button
+                onClick={() => setNoKeyDialogPlan(null)}
+                className="absolute top-5 right-5 p-2 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                type="button"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-5 h-5 text-amber-500" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white font-heading">
+                    Payment Gateway Not Configured
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {noKeyDialogPlan.name} Plan — {noKeyDialogPlan.price}/month
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3 text-xs text-slate-700 dark:text-slate-300">
+                <p className="font-semibold text-slate-900 dark:text-white">To enable payments, add your Razorpay keys:</p>
+                <div className="space-y-1.5 font-mono text-[11px] bg-white dark:bg-slate-950 rounded-xl p-3 border border-slate-200 dark:border-slate-800">
+                  <p className="text-slate-500"># In .env or Vercel environment variables:</p>
+                  <p><span className="text-blue-600 dark:text-sky-400">NEXT_PUBLIC_RAZORPAY_KEY_ID</span>=rzp_test_XXXX</p>
+                  <p><span className="text-blue-600 dark:text-sky-400">RAZORPAY_KEY_ID</span>=rzp_test_XXXX</p>
+                  <p><span className="text-blue-600 dark:text-sky-400">RAZORPAY_KEY_SECRET</span>=XXXX</p>
+                </div>
+                <p className="text-slate-500">Get your keys from <a href="https://dashboard.razorpay.com" target="_blank" rel="noreferrer" className="text-[#3157D5] dark:text-[#4F8CFF] underline font-semibold">dashboard.razorpay.com</a></p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setNoKeyDialogPlan(null)}
+                  className="flex-1 py-3 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                  type="button"
+                >
+                  Close
+                </button>
+                <a
+                  href="https://dashboard.razorpay.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold text-white bg-[#3157D5] dark:bg-[#4F8CFF] hover:bg-[#2848b8] transition-all shadow-md"
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  Set Up Razorpay
+                </a>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }

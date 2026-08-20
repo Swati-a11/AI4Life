@@ -61,8 +61,11 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
     );
 
     if (!isRealKey) {
-      // Simulate payment success when Razorpay not configured
-      await verifyAndUpgrade(`order_sim_${Date.now()}`, `pay_sim_${Date.now()}`, "sig_simulated", addedCredits);
+      // No real Razorpay key — show error in modal, do NOT auto-close or grant credits
+      setErrorMessage(
+        "Payment gateway not configured. Add NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your environment variables to enable payments."
+      );
+      setIsProcessing(false);
       return;
     }
 
