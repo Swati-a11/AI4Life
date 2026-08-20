@@ -20,6 +20,7 @@ import {
   VolumeX
 } from "lucide-react";
 import { AITutorMode, ChatMessage } from "@/lib/types/student-types";
+import { getOrCreateLocalUserId } from "@/lib/utils/user-id-utils";
 
 interface AITutorViewProps {
   onDeductCredits: (cost: number) => boolean;
@@ -174,17 +175,21 @@ export function AITutorView({ onDeductCredits, isStandalone = false }: AITutorVi
     setIsGenerating(true);
 
     try {
+      const userId = getOrCreateLocalUserId();
       const res = await fetch("/api/tutor", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": userId
+        },
         body: JSON.stringify({
           query: textToSend,
           mode: selectedMode,
           persona: isStandalone ? "standalone" : persona,
           isStandalone,
+          userId,
           conversationId: isStandalone ? "standalone_chat_session" : `tutor_${persona}_session`,
-          conversationHistory: updatedMessages.slice(-10).map((m) => ({ sender: m.sender, content: m.text })),
-          memoryContext: "Prefers intuitive explanations with real-world examples"
+          conversationHistory: updatedMessages.slice(-10).map((m) => ({ sender: m.sender, content: m.text }))
         })
       });
 

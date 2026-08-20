@@ -19,7 +19,8 @@ import {
   LayoutDashboard,
   Home,
   LogOut,
-  Bot
+  Bot,
+  Brain
 } from "lucide-react";
 import { StudentTab } from "@/lib/types/student-types";
 import { ThemeToggle } from "../ThemeToggle";
@@ -46,7 +47,7 @@ export function StudentShell({ currentTab, onTabChange, children }: StudentShell
   const [isSearching, setIsSearching] = useState(false);
 
   // User state
-  const [currentUser, setCurrentUser] = useState<any>({ name: "Swati Kumari", email: "swati@student.ai4life.com" });
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -124,12 +125,13 @@ export function StudentShell({ currentTab, onTabChange, children }: StudentShell
     { tab: "materials" as StudentTab, label: "My Materials", icon: FileText },
     { tab: "quiz-lab" as StudentTab, label: "Quiz Lab", icon: Sparkles },
     { tab: "planner" as StudentTab, label: "Study Planner", icon: Calendar },
+    { tab: "memory" as StudentTab, label: "Personalized Memory", icon: Brain, badge: "Mem0" },
     { tab: "progress" as StudentTab, label: "Progress", icon: BarChart2 },
     { tab: "saved" as StudentTab, label: "Saved Notes", icon: Bookmark },
   ];
 
   return (
-    <div className="min-h-screen bg-[#F4F3EE] dark:bg-[#080B12] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300">
+    <div className="min-h-screen bg-[#F4F3EE] dark:bg-[#080B12] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300 workspace-shell student-workspace">
       
       {/* Top Fixed Header */}
       <header className="h-16 border-b border-[#D5CBC2] dark:border-slate-800 bg-[#F4F3EE]/90 dark:bg-[#080B12]/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between gap-4">

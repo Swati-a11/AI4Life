@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Electrolize&family=Hind+Madurai:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Pridi:wght@300;400;500;600;700&family=Rationale&display=swap');
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -20,6 +21,13 @@
     --card-shadow: 0 20px 50px rgba(20, 30, 50, 0.08);
     
     --grid-pattern: rgba(17, 19, 24, 0.035);
+
+    --font-montserrat: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-lora: 'Lora', Georgia, Cambria, 'Times New Roman', Times, serif;
+    --font-hind-madurai: 'Hind Madurai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-electrolize: 'Electrolize', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-rationale: 'Rationale', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-pridi: 'Pridi', Georgia, Cambria, serif;
   }
 
   .dark {
@@ -42,12 +50,83 @@
   }
 }
 
+/* Landing Page Typography: Montserrat + Lora + Hind Madurai */
 html, body {
   background-color: var(--bg-canvas);
   color: var(--fg-primary);
   scroll-behavior: smooth;
-  font-family: var(--font-body), system-ui, sans-serif;
+  font-family: var(--font-hind-madurai), 'Hind Madurai', sans-serif;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.font-heading, h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-montserrat), 'Montserrat', sans-serif;
+}
+
+button, .btn, nav {
+  font-family: var(--font-montserrat), 'Montserrat', sans-serif;
+}
+
+.font-serif, .font-editorial, em, blockquote {
+  font-family: var(--font-lora), 'Lora', serif;
+}
+
+.font-body {
+  font-family: var(--font-hind-madurai), 'Hind Madurai', sans-serif;
+}
+
+/* Rest of the Website & Workspace Typography: Electrolize + Rationale + Pridi */
+.workspace-shell,
+.student-workspace,
+.professional-workspace,
+.household-workspace,
+[data-workspace="student"],
+[data-workspace="professional"],
+[data-workspace="household"] {
+  font-family: var(--font-pridi), 'Pridi', serif;
+}
+
+.workspace-shell h1,
+.workspace-shell h2,
+.workspace-shell h3,
+.workspace-shell h4,
+.workspace-shell h5,
+.workspace-shell h6,
+.workspace-shell .font-heading,
+.student-workspace h1,
+.student-workspace h2,
+.student-workspace h3,
+.student-workspace h4,
+.student-workspace h5,
+.student-workspace h6,
+.student-workspace .font-heading {
+  font-family: var(--font-electrolize), 'Electrolize', sans-serif !important;
+}
+
+.workspace-shell nav,
+.workspace-shell button,
+.workspace-shell .nav-item,
+.workspace-shell .nav-tab,
+.workspace-shell .sidebar-item,
+.student-workspace nav,
+.student-workspace button,
+.student-workspace .nav-item,
+.student-workspace .nav-tab,
+.student-workspace .sidebar-item {
+  font-family: var(--font-rationale), 'Rationale', sans-serif !important;
+}
+
+.workspace-shell p,
+.workspace-shell span:not(.font-heading):not(button *),
+.workspace-shell li,
+.workspace-shell input,
+.workspace-shell textarea,
+.student-workspace p,
+.student-workspace span:not(.font-heading):not(button *),
+.student-workspace li,
+.student-workspace input,
+.student-workspace textarea {
+  font-family: var(--font-pridi), 'Pridi', serif;
 }
 
 /* Hide Clerk Keyless Mode Banner & Missing API Key Alerts */

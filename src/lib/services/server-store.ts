@@ -463,14 +463,25 @@ class ServerStateStore {
     const mem = this.getUserLearningMemory(userId);
     mem.explanationStyle = style;
 
-    this.addPreference(
-      {
-        category: "Explanation Style",
-        preference: `Prefers ${style.toLowerCase()} format explanations`,
-        confidence: 0.98
-      },
-      userId
-    );
+    const key = userId || "default_user";
+    const userPrefs = this.getPreferences(key);
+    const existingIdx = userPrefs.findIndex((p) => p.category === "Explanation Style" || p.category === "Response Format");
+    const newPrefText = `Prefers ${style.toLowerCase()} format explanations`;
+
+    if (existingIdx !== -1) {
+      userPrefs[existingIdx].preference = newPrefText;
+      userPrefs[existingIdx].updatedAt = new Date().toISOString().split("T")[0];
+      userPrefs[existingIdx].confidence = 0.98;
+    } else {
+      this.addPreference(
+        {
+          category: "Explanation Style",
+          preference: newPrefText,
+          confidence: 0.98
+        },
+        userId
+      );
+    }
 
     return mem;
   }
@@ -787,15 +798,7 @@ class ServerStateStore {
   getPreferences(userId?: string): Mem0Preference[] {
     const key = userId || "default_user";
     if (!this.userMem0Map.has(key)) {
-      this.userMem0Map.set(key, [
-        {
-          id: `pref_init_${Date.now()}`,
-          category: "Explanation Style",
-          preference: "Prefers bullet points format explanations",
-          confidence: 0.95,
-          updatedAt: new Date().toISOString().split("T")[0]
-        }
-      ]);
+      this.userMem0Map.set(key, []);
     }
     return this.userMem0Map.get(key)!;
   }

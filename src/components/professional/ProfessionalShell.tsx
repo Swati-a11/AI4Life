@@ -74,7 +74,7 @@ export function ProfessionalShell({ currentTab, onTabChange, children }: Profess
   };
 
   return (
-    <div className="min-h-screen bg-[#E5DFC5]/40 dark:bg-[#080B12] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors p-2 sm:p-4 md:p-6">
+    <div className="min-h-screen bg-[#E5DFC5]/40 dark:bg-[#080B12] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors p-2 sm:p-4 md:p-6 workspace-shell professional-workspace">
       
       {/* Outer Shell Card Container matching Student Workspace rounded card backdrop */}
       <div className="max-w-7xl w-full mx-auto bg-[#EFEAE6] dark:bg-[#0E131F] rounded-[36px] border border-[#E2DAD3] dark:border-slate-800/80 shadow-2xl overflow-hidden flex flex-col min-h-[92vh]">

@@ -1,10 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Brain, Sparkles, Plus, CheckCircle2, Sliders, BookOpen, Target, Lightbulb, RotateCcw } from "lucide-react";
+import {
+  Brain,
+  Sparkles,
+  Plus,
+  CheckCircle2,
+  Sliders,
+  BookOpen,
+  Target,
+  Lightbulb,
+  RotateCcw,
+  ShieldCheck,
+  Check
+} from "lucide-react";
 import { Mem0Preference } from "@/lib/types/student-types";
 import { ExplanationStyle, UserLearningMemory } from "@/lib/services/server-store";
+import { getOrCreateLocalUserId } from "@/lib/utils/user-id-utils";
 
 export function Mem0MemoryView() {
   const [memory, setMemory] = useState<UserLearningMemory | null>(null);
@@ -14,13 +27,14 @@ export function Mem0MemoryView() {
   const [newPref, setNewPref] = useState("");
   const [indicatorMsg, setIndicatorMsg] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchMemory();
-  }, []);
-
-  const fetchMemory = () => {
-    fetch("/api/memory")
+  const fetchMemory = useCallback(() => {
+    setIsLoading(true);
+    const userId = getOrCreateLocalUserId();
+    fetch("/api/memory", {
+      headers: { "x-user-id": userId }
+    })
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -33,15 +47,24 @@ export function Mem0MemoryView() {
           }
         }
       })
-      .catch(console.error);
-  };
+      .catch(console.error)
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetchMemory();
+  }, [fetchMemory]);
 
   const handleSelectStyle = async (style: ExplanationStyle) => {
     setSelectedStyle(style);
+    const userId = getOrCreateLocalUserId();
     try {
       const res = await fetch("/api/memory", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": userId
+        },
         body: JSON.stringify({ action: "update_style", style })
       });
       const data = await res.json();
@@ -58,10 +81,14 @@ export function Mem0MemoryView() {
   const handleAddCustom = async () => {
     if (!newPref.trim()) return;
     setIsSaving(true);
+    const userId = getOrCreateLocalUserId();
     try {
       const res = await fetch("/api/memory", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": userId
+        },
         body: JSON.stringify({
           action: "add_custom",
           category: newCat.trim() || "Learning Preference",
@@ -90,22 +117,22 @@ export function Mem0MemoryView() {
     {
       style: "Bullet Points",
       label: "Bullet Points",
-      desc: "Structured bullet list format focusing on key takeaways."
+      desc: "Structured bullet list format focusing on core takeaways and clarity."
     },
     {
       style: "Paragraphs",
       label: "Paragraphs",
-      desc: "Comprehensive fluid paragraph text without lists."
+      desc: "Comprehensive fluid paragraph text without rigid lists."
     },
     {
       style: "Short & Direct",
       label: "Short & Direct",
-      desc: "Concise 1–2 sentence direct answers without extra fluff."
+      desc: "Concise 1–2 sentence direct answers without extra filler."
     },
     {
       style: "Step-by-Step",
       label: "Step-by-Step",
-      desc: "Numbered sequential steps (Step 1:, Step 2:, etc.)."
+      desc: "Numbered sequential steps (Step 1, Step 2, etc.) for structured problem solving."
     }
   ];
 
@@ -114,15 +141,28 @@ export function Mem0MemoryView() {
       
       {/* Header Banner */}
       <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 text-xs font-extrabold border border-purple-500/20">
-          <Brain className="w-3.5 h-3.5" />
-          Mem0 Personal Learning Memory
+        <div className="flex items-center justify-between">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 text-xs font-extrabold border border-purple-500/20">
+            <Brain className="w-3.5 h-3.5" />
+            Mem0 Personal Learning Memory
+          </div>
+
+          <button
+            onClick={fetchMemory}
+            disabled={isLoading}
+            className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
+            title="Refresh memory"
+            type="button"
+          >
+            <RotateCcw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+          </button>
         </div>
+
         <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white font-heading">
-          Personalized Learning Memory & Style Selector
+          Personalized Learning Memory
         </h2>
         <p className="text-xs text-slate-600 dark:text-slate-300 max-w-2xl font-medium">
-          Choose how AI tutors explain concepts across the Student Workspace. Your preferences shape response structures for Aarav, Riya, AI Tutor, Ask From Materials, and AI Se Baazi.
+          AI4Life learns how you prefer to study and adapts future interactions. Your preferences shape response structures for Aarav Mehta, Riya Kapoor, AI Tutor, Ask From Materials, and AI Se Baazi.
         </p>
       </div>
 
@@ -132,7 +172,7 @@ export function Mem0MemoryView() {
           animate={{ opacity: 1, y: 0 }}
           className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/30 text-purple-700 dark:text-purple-300 font-bold text-xs flex items-center gap-2"
         >
-          <Sparkles className="w-4 h-4 text-purple-500" />
+          <Sparkles className="w-4 h-4 text-purple-500 shrink-0" />
           <span>{indicatorMsg}</span>
         </motion.div>
       )}
@@ -145,10 +185,10 @@ export function Mem0MemoryView() {
               EXPLANATION FORMAT PREFERENCE
             </span>
             <h3 className="text-lg font-black text-slate-900 dark:text-white font-heading">
-              How should AI explain things?
+              Preferred Explanation Style
             </h3>
           </div>
-          <span className="text-xs font-bold text-slate-400">Applies across all AI tutors</span>
+          <span className="text-xs font-bold text-slate-400">Active for all AI Tutors</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -175,7 +215,7 @@ export function Mem0MemoryView() {
                   </p>
                 </div>
                 <span className={`text-[10px] font-black uppercase tracking-wider block ${isSelected ? "text-purple-600 dark:text-purple-400" : "text-slate-400"}`}>
-                  {isSelected ? "ACTIVE PREFERENCE" : "SELECT STYLE"}
+                  {isSelected ? "ACTIVE FORMAT" : "SELECT STYLE"}
                 </span>
               </button>
             );
@@ -183,10 +223,10 @@ export function Mem0MemoryView() {
         </div>
       </div>
 
-      {/* SECTION 2: "What should AI remember?" Memory Summary Card Grid */}
+      {/* SECTION 2: Learned Learning Preferences & Memory Cards */}
       <div className="p-6 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
         <h3 className="text-lg font-black text-slate-900 dark:text-white font-heading">
-          What should AI remember?
+          Learned Learning Profile
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -194,52 +234,53 @@ export function Mem0MemoryView() {
           {/* Explanation Style Vault Card */}
           <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
             <div className="flex items-center justify-between text-xs font-extrabold text-purple-600 dark:text-purple-400">
-              <span className="flex items-center gap-1.5"><Sliders className="w-3.5 h-3.5" /> Style</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-bold">95% Confidence</span>
+              <span className="flex items-center gap-1.5"><Sliders className="w-3.5 h-3.5" /> Response Format</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-bold">Active</span>
             </div>
             <p className="text-xs font-bold text-slate-900 dark:text-white">
-              "Prefers {selectedStyle.toLowerCase()} format explanations"
+              "{selectedStyle} format"
             </p>
-            <button
-              onClick={() => handleSelectStyle("Bullet Points")}
-              className="text-[10px] font-bold text-purple-600 dark:text-purple-400 hover:underline pt-1 block cursor-pointer"
-              type="button"
-            >
-              [ Change Preference ]
-            </button>
+            <p className="text-[10px] text-slate-500">Applied across tutor explanations</p>
           </div>
 
           {/* Frequently Studied Topics Card */}
           <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
             <div className="flex items-center justify-between text-xs font-extrabold text-blue-600 dark:text-blue-400">
-              <span className="flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> Frequently Studied</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 font-bold">Persisted</span>
+              <span className="flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> Studied Topics</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 font-bold">Tracked</span>
             </div>
-            <p className="text-xs font-bold text-slate-900 dark:text-white">
-              {memory?.frequentlyStudied ? memory.frequentlyStudied.join(", ") : "JavaScript, Python, DSA"}
+            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+              {memory?.frequentlyStudied && memory.frequentlyStudied.length > 0
+                ? memory.frequentlyStudied.join(", ")
+                : "Python, React, Data Structures"}
             </p>
+            <p className="text-[10px] text-slate-500">Based on recent study queries</p>
           </div>
 
           {/* Focus / Weak Areas Card */}
           <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
             <div className="flex items-center justify-between text-xs font-extrabold text-amber-600 dark:text-amber-400">
               <span className="flex items-center gap-1.5"><Target className="w-3.5 h-3.5" /> Focus Areas</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 font-bold">Active</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 font-bold">Adaptive</span>
             </div>
-            <p className="text-xs font-bold text-slate-900 dark:text-white">
-              {memory?.weakTopics ? memory.weakTopics.join(", ") : "React, Databases"}
+            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+              {memory?.weakTopics && memory.weakTopics.length > 0
+                ? memory.weakTopics.join(", ")
+                : "Concepts under active practice"}
             </p>
+            <p className="text-[10px] text-slate-500">Reinforced during check questions</p>
           </div>
 
           {/* Custom Learning Goals Card */}
           <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
             <div className="flex items-center justify-between text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
-              <span className="flex items-center gap-1.5"><Lightbulb className="w-3.5 h-3.5" /> Learning Goals</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-bold">Adaptive</span>
+              <span className="flex items-center gap-1.5"><Lightbulb className="w-3.5 h-3.5" /> Tutor Tone</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-bold">Personalized</span>
             </div>
             <p className="text-xs font-bold text-slate-900 dark:text-white">
-              "Prefers intuitive examples and step-by-step explanations"
+              "Structured pedagogical check-in"
             </p>
+            <p className="text-[10px] text-slate-500">Teach → Check → Evaluate loop</p>
           </div>
 
         </div>
@@ -249,10 +290,10 @@ export function Mem0MemoryView() {
       <div className="p-6 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
         <div className="space-y-1">
           <h3 className="text-base font-black text-slate-900 dark:text-white font-heading">
-            Add Custom AI Learning Preference
+            Add Custom Learning Preference
           </h3>
           <p className="text-xs text-slate-500">
-            Tell AI how you learn best (e.g. "Explain difficult concepts using real-life examples").
+            Tell AI how you learn best (e.g. "Use real-life analogies when explaining complex code" or "Always provide code snippets in TypeScript").
           </p>
         </div>
 
@@ -268,13 +309,13 @@ export function Mem0MemoryView() {
             type="text"
             value={newPref}
             onChange={(e) => setNewPref(e.target.value)}
-            placeholder="Preference details (e.g. Explain difficult concepts using real-life examples)"
+            placeholder="Preference details (e.g. Use real-life analogies when explaining complex code)"
             className="flex-1 w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none"
           />
           <button
             onClick={handleAddCustom}
             disabled={isSaving || !newPref.trim()}
-            className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-purple-600 text-white font-black text-xs hover:bg-purple-700 shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-purple-600 text-white font-black text-xs hover:bg-purple-700 shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
             type="button"
           >
             <Plus className="w-4 h-4" />
@@ -283,33 +324,43 @@ export function Mem0MemoryView() {
         </div>
       </div>
 
-      {/* Persisted Custom Preferences Vault History */}
-      {preferences.length > 0 && (
-        <div className="p-6 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
-          <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">
-            SAVED MEMORY VAULT LOG
-          </h3>
+      {/* Persisted Custom Preferences Vault History / Clean Empty State */}
+      <div className="p-6 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
+        <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">
+          SAVED MEMORY VAULT LOG
+        </h3>
 
+        {preferences.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {preferences.map((pref) => (
               <div key={pref.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
                 <div className="flex items-center justify-between font-bold">
                   <span className="text-purple-600 dark:text-purple-400 uppercase text-[10px]">{pref.category}</span>
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500">
-                    {Math.round(pref.confidence * 100)}% Confidence
+                    {Math.round((pref.confidence || 0.95) * 100)}% Confidence
                   </span>
                 </div>
                 <p className="text-slate-800 dark:text-slate-200 font-medium">
                   "{pref.preference}"
                 </p>
                 <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-800">
-                  Last synced: {pref.updatedAt}
+                  Last synced: {pref.updatedAt || "Recently"}
                 </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="p-8 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center space-y-2">
+            <ShieldCheck className="w-8 h-8 text-purple-500 mx-auto" />
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+              No custom preferences added yet
+            </h4>
+            <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+              Add your learning preferences above or select an explanation format to personalize how Aarav Mehta and Riya Kapoor teach concepts.
+            </p>
+          </div>
+        )}
+      </div>
 
     </div>
   );
