@@ -63,6 +63,8 @@ export async function POST(req: NextRequest) {
 
       serverState.addDocument(newDoc);
 
+      const fullContent = newDoc.chunks.map((c) => c.text).join("\n\n");
+
       return NextResponse.json({
         success: true,
         document: {
@@ -73,6 +75,18 @@ export async function POST(req: NextRequest) {
           uploadedAt: newDoc.uploadedAt,
           status: newDoc.processingStatus,
           chunksGenerated: newDoc.chunks.length
+        },
+        material: {
+          id: newDoc.id,
+          name: newDoc.title,
+          title: newDoc.title,
+          type: newDoc.sourceType,
+          sourceType: newDoc.sourceType,
+          content: fullContent,
+          extractedText: fullContent,
+          status: newDoc.processingStatus,
+          sizeMb: newDoc.sizeMb,
+          uploadedAt: newDoc.uploadedAt
         }
       });
     }
@@ -353,6 +367,8 @@ export async function POST(req: NextRequest) {
 
     serverState.addDocument(newDoc);
 
+    const fullContent = newDoc.chunks.map((c) => c.text).join("\n\n");
+
     return NextResponse.json({
       success: true,
       document: {
@@ -365,6 +381,18 @@ export async function POST(req: NextRequest) {
         transcriptionStatus: newDoc.transcriptionStatus,
         chunksGenerated: newDoc.chunks.length,
         error: newDoc.error
+      },
+      material: {
+        id: newDoc.id,
+        name: newDoc.title,
+        title: newDoc.title,
+        type: newDoc.sourceType,
+        sourceType: newDoc.sourceType,
+        content: fullContent,
+        extractedText: fullContent,
+        status: newDoc.processingStatus,
+        sizeMb: newDoc.sizeMb,
+        uploadedAt: newDoc.uploadedAt
       }
     });
   } catch (error: any) {

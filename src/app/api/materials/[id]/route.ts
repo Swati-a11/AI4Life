@@ -27,16 +27,21 @@ export async function GET(
     const rawText = cleanChunks.map((c) => c.text).join("\n\n---\n\n");
     const cleanedText = GeminiAIService.cleanExtractedPdfText(rawText);
 
+    const fullContent = cleanedText || cleanChunks.map((c) => c.text).join("\n\n") || "Could not extract readable content from this source.";
+
     return NextResponse.json({
       success: true,
       material: {
         id: doc.id,
+        name: doc.title,
         title: doc.title,
+        type: doc.sourceType,
         sourceType: doc.sourceType,
         sizeMb: doc.sizeMb,
         uploadedAt: doc.uploadedAt,
         status: doc.processingStatus,
-        extractedText: cleanedText || "Could not extract readable content from this source.",
+        content: fullContent,
+        extractedText: fullContent,
         chunks: cleanChunks
       }
     });
