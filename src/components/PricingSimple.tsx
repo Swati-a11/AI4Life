@@ -83,7 +83,6 @@ export function PricingSimple() {
       const isRealKey = Boolean(
         envKeyId &&
         envKeyId.startsWith("rzp_") &&
-        envKeyId.length >= 20 &&
         !envKeyId.includes("your_") &&
         !envKeyId.includes("SpFs6") // known placeholder fragment
       );

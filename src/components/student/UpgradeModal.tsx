@@ -55,7 +55,6 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
     const isRealKey = Boolean(
       envKeyId &&
       envKeyId.startsWith("rzp_") &&
-      envKeyId.length >= 20 &&
       !envKeyId.includes("your_") &&
       !envKeyId.includes("SpFs6")
     );
