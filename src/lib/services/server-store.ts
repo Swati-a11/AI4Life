@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { AITutorMode, QuizQuestion, ChallengeMatch, StudyTask, Mem0Preference, SavedItem } from "../types/student-types";
 import { getCollection } from "../db/models";
 
@@ -482,8 +484,52 @@ class ServerStateStore {
     return this.addPreference({ category, preference, confidence: 0.95 }, userId);
   }
 
-  // Documents (Strict User Isolation + MongoDB Persistence across Vercel Lambdas)
+  // Shared Cross-Process Disk Storage Fallback Helper (ensures worker thread sync when MONGODB_URI is unconfigured)
+  private getStorageFilePath(): string {
+    try {
+      const tmpDir = process.env.TMPDIR || "/tmp";
+      return path.join(tmpDir, "ai4life_documents_store.json");
+    } catch (e) {
+      return "/tmp/ai4life_documents_store.json";
+    }
+  }
+
+  private loadDocumentsFromDisk(): StoredDocument[] {
+    try {
+      const filePath = this.getStorageFilePath();
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, "utf-8");
+        if (content && content.trim().length > 0) {
+          const parsed = JSON.parse(content);
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+        }
+      }
+    } catch (e) {
+      // Quiet fallback
+    }
+    return [];
+  }
+
+  private saveDocumentsToDisk() {
+    try {
+      const filePath = this.getStorageFilePath();
+      fs.writeFileSync(filePath, JSON.stringify(this.documents, null, 2), "utf-8");
+    } catch (e) {
+      // Quiet fallback
+    }
+  }
+
+  // Documents (Strict User Isolation + MongoDB + Cross-Process Disk Sync)
   getDocuments(userId?: string): StoredDocument[] {
+    const diskDocs = this.loadDocumentsFromDisk();
+    diskDocs.forEach((d) => {
+      if (!this.documents.some((m) => m.id === d.id)) {
+        this.documents.push(d);
+      }
+    });
+
     if (userId) {
       return this.documents.filter((d) => d.userId === userId);
     }
@@ -517,6 +563,7 @@ class ServerStateStore {
               this.documents[idx] = doc;
             }
           });
+          this.saveDocumentsToDisk();
           return userId ? this.documents.filter((d) => d.userId === userId) : this.documents;
         }
       }
@@ -533,6 +580,7 @@ class ServerStateStore {
     } else {
       this.documents.unshift(doc);
     }
+    this.saveDocumentsToDisk();
     return doc;
   }
 
@@ -567,17 +615,27 @@ class ServerStateStore {
 
   findDocument(id?: string, userId?: string): StoredDocument | undefined {
     if (!id) return undefined;
-    return this.documents.find((d) => (d.id === id || (d as any).materialId === id) && (!userId || d.userId === userId));
+
+    let match = this.documents.find((d) => (d.id === id || (d as any).materialId === id) && (!userId || d.userId === userId));
+    if (!match) {
+      const diskDocs = this.loadDocumentsFromDisk();
+      const diskMatch = diskDocs.find((d) => (d.id === id || (d as any).materialId === id) && (!userId || d.userId === userId));
+      if (diskMatch) {
+        this.addDocument(diskMatch);
+        match = diskMatch;
+      }
+    }
+    return match;
   }
 
   async findDocumentAsync(id?: string, userId?: string): Promise<StoredDocument | undefined> {
     if (!id) return undefined;
 
-    // 1. Check in-memory state first
+    // 1. Check in-memory state & disk fallback first
     const localMatch = this.findDocument(id, userId) || this.findDocument(id);
     if (localMatch) return localMatch;
 
-    // 2. Query MongoDB collection if not in local instance memory
+    // 2. Query MongoDB collection if not in local instance memory or disk
     try {
       const col = await getCollection("documents");
       if (col) {
@@ -615,6 +673,7 @@ class ServerStateStore {
   deleteDocument(id: string, userId?: string): boolean {
     const initialLength = this.documents.length;
     this.documents = this.documents.filter((d) => d.id !== id || (userId && d.userId !== userId));
+    this.saveDocumentsToDisk();
     return this.documents.length < initialLength;
   }
 
