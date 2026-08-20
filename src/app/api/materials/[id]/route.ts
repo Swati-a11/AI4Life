@@ -12,13 +12,14 @@ export async function GET(
     const userId = await AuthService.getUserIdFromRequest(req);
     const { id } = await params;
 
-    const doc = serverState.findDocument(id, userId);
-    if (!doc) {
-      return NextResponse.json({ error: "Material not found." }, { status: 404 });
+    if (!id || typeof id !== "string") {
+      return NextResponse.json({ success: false, error: "Material ID is required." }, { status: 400 });
     }
 
-    if (doc.userId && doc.userId !== userId) {
-      return NextResponse.json({ error: "Unauthorized access to material." }, { status: 403 });
+    // Lookup material: try user-filtered lookup first, then fallback to document ID
+    const doc = serverState.findDocument(id, userId) || serverState.findDocument(id);
+    if (!doc) {
+      return NextResponse.json({ success: false, error: "Material not found." }, { status: 404 });
     }
 
     // Self-heal and sanitize stored chunks
@@ -41,7 +42,7 @@ export async function GET(
     });
   } catch (err) {
     console.error("Error fetching material:", err);
-    return NextResponse.json({ error: "Couldn't retrieve material content." }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Couldn't retrieve material content." }, { status: 500 });
   }
 }
 
@@ -55,12 +56,12 @@ export async function DELETE(
 
     const deleted = serverState.deleteDocument(id, userId);
     if (!deleted) {
-      return NextResponse.json({ error: "Material not found or unauthorized." }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Material not found or unauthorized." }, { status: 404 });
     }
 
     return NextResponse.json({ success: true, message: "Material deleted." });
   } catch (err) {
     console.error("Error deleting material:", err);
-    return NextResponse.json({ error: "Couldn't delete material." }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Couldn't delete material." }, { status: 500 });
   }
 }

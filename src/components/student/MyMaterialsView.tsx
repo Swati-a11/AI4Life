@@ -21,6 +21,7 @@ import {
   Bookmark
 } from "lucide-react";
 import { StudyMaterial, StudentTab } from "@/lib/types/student-types";
+import { getOrCreateLocalUserId } from "@/lib/utils/user-id-utils";
 
 interface MyMaterialsViewProps {
   onTabChange: (tab: StudentTab) => void;
@@ -49,7 +50,10 @@ export function MyMaterialsView({ onTabChange }: MyMaterialsViewProps) {
 
   const fetchMaterials = () => {
     setIsLoading(true);
-    fetch("/api/upload")
+    const userId = getOrCreateLocalUserId();
+    fetch("/api/upload", {
+      headers: { "x-user-id": userId }
+    })
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.documents) {
@@ -89,12 +93,14 @@ export function MyMaterialsView({ onTabChange }: MyMaterialsViewProps) {
     setUploadStatusText("Uploading & Processing...");
 
     try {
+      const userId = getOrCreateLocalUserId();
       const formData = new FormData();
       formData.append("file", file);
 
       setUploadStatusText("Processing text/audio...");
       const res = await fetch("/api/upload", {
         method: "POST",
+        headers: { "x-user-id": userId },
         body: formData
       });
 
@@ -131,9 +137,13 @@ export function MyMaterialsView({ onTabChange }: MyMaterialsViewProps) {
     setUploadStatusText("Extracting YouTube Transcript...");
 
     try {
+      const userId = getOrCreateLocalUserId();
       const res = await fetch("/api/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-user-id": userId 
+        },
         body: JSON.stringify({ youtubeUrl: youtubeUrlInput })
       });
 
@@ -167,12 +177,15 @@ export function MyMaterialsView({ onTabChange }: MyMaterialsViewProps) {
   const handleOpenSourceViewer = async (id: string) => {
     setIsFetchingSource(true);
     try {
-      const res = await fetch(`/api/materials/${id}`);
+      const userId = getOrCreateLocalUserId();
+      const res = await fetch(`/api/materials/${id}`, {
+        headers: { "x-user-id": userId }
+      });
       const data = await res.json();
       if (data.success && data.material) {
         setViewingMaterial(data.material);
       } else {
-        alert("Could not extract readable content from this source.");
+        alert(data.error || "Could not extract readable content from this source.");
       }
     } catch (err) {
       console.error("Source viewer error:", err);
