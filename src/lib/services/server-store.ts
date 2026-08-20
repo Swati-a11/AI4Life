@@ -1,4 +1,5 @@
 import { AITutorMode, QuizQuestion, ChallengeMatch, StudyTask, Mem0Preference, SavedItem } from "../types/student-types";
+import { getCollection } from "../db/models";
 
 export type TutorState =
   | "CASUAL"
@@ -481,7 +482,7 @@ class ServerStateStore {
     return this.addPreference({ category, preference, confidence: 0.95 }, userId);
   }
 
-  // Documents (Strict User Isolation)
+  // Documents (Strict User Isolation + MongoDB Persistence across Vercel Lambdas)
   getDocuments(userId?: string): StoredDocument[] {
     if (userId) {
       return this.documents.filter((d) => d.userId === userId);
@@ -489,20 +490,145 @@ class ServerStateStore {
     return this.documents;
   }
 
+  async getDocumentsAsync(userId?: string): Promise<StoredDocument[]> {
+    try {
+      const col = await getCollection("documents");
+      if (col) {
+        const query = userId ? { userId } : {};
+        const dbDocs = await col.find(query).sort({ uploadedAt: -1, _id: -1 }).toArray();
+        if (dbDocs && dbDocs.length > 0) {
+          const mapped: StoredDocument[] = dbDocs.map((d: any) => ({
+            id: d.id || d.materialId,
+            title: d.title || d.name || "Untitled Material",
+            sourceType: d.sourceType || d.type || "pdf",
+            sizeMb: d.sizeMb || 1.2,
+            uploadedAt: d.uploadedAt || d.date || new Date().toISOString().split("T")[0],
+            processingStatus: d.processingStatus || d.status || "ready",
+            transcriptionStatus: d.transcriptionStatus,
+            userId: d.userId,
+            chunks: d.chunks || [],
+            error: d.error
+          }));
+          mapped.forEach((doc) => {
+            const idx = this.documents.findIndex((m) => m.id === doc.id);
+            if (idx === -1) {
+              this.documents.push(doc);
+            } else {
+              this.documents[idx] = doc;
+            }
+          });
+          return userId ? this.documents.filter((d) => d.userId === userId) : this.documents;
+        }
+      }
+    } catch (err) {
+      console.warn("[ServerStore] MongoDB getDocumentsAsync error:", err);
+    }
+    return this.getDocuments(userId);
+  }
+
   addDocument(doc: StoredDocument): StoredDocument {
-    this.documents.unshift(doc);
+    const existingIdx = this.documents.findIndex((d) => d.id === doc.id);
+    if (existingIdx !== -1) {
+      this.documents[existingIdx] = doc;
+    } else {
+      this.documents.unshift(doc);
+    }
+    return doc;
+  }
+
+  async addDocumentAsync(doc: StoredDocument): Promise<StoredDocument> {
+    this.addDocument(doc);
+    try {
+      const col = await getCollection("documents");
+      if (col) {
+        const fullText = doc.chunks.map((c) => c.text).join("\n\n");
+        await col.updateOne(
+          { $or: [{ id: doc.id }, { materialId: doc.id }] },
+          {
+            $set: {
+              ...doc,
+              materialId: doc.id,
+              name: doc.title,
+              type: doc.sourceType,
+              status: doc.processingStatus,
+              extractedText: fullText,
+              content: fullText,
+              updatedAt: new Date().toISOString()
+            }
+          },
+          { upsert: true }
+        );
+      }
+    } catch (err) {
+      console.warn("[ServerStore] MongoDB addDocumentAsync error:", err);
+    }
     return doc;
   }
 
   findDocument(id?: string, userId?: string): StoredDocument | undefined {
     if (!id) return undefined;
-    return this.documents.find((d) => d.id === id && (!userId || d.userId === userId));
+    return this.documents.find((d) => (d.id === id || (d as any).materialId === id) && (!userId || d.userId === userId));
+  }
+
+  async findDocumentAsync(id?: string, userId?: string): Promise<StoredDocument | undefined> {
+    if (!id) return undefined;
+
+    // 1. Check in-memory state first
+    const localMatch = this.findDocument(id, userId) || this.findDocument(id);
+    if (localMatch) return localMatch;
+
+    // 2. Query MongoDB collection if not in local instance memory
+    try {
+      const col = await getCollection("documents");
+      if (col) {
+        const dbDoc: any = await col.findOne({ $or: [{ id: id }, { materialId: id }] });
+        if (dbDoc) {
+          const stored: StoredDocument = {
+            id: dbDoc.id || dbDoc.materialId || id,
+            title: dbDoc.title || dbDoc.name || "Untitled Material",
+            sourceType: dbDoc.sourceType || dbDoc.type || "pdf",
+            sizeMb: dbDoc.sizeMb || 1.2,
+            uploadedAt: dbDoc.uploadedAt || dbDoc.date || new Date().toISOString().split("T")[0],
+            processingStatus: dbDoc.processingStatus || dbDoc.status || "ready",
+            transcriptionStatus: dbDoc.transcriptionStatus,
+            userId: dbDoc.userId || userId,
+            chunks: dbDoc.chunks || [
+              {
+                id: `c_${Date.now()}_1`,
+                text: dbDoc.extractedText || dbDoc.content || "",
+                page: 1
+              }
+            ],
+            error: dbDoc.error
+          };
+          this.addDocument(stored);
+          return stored;
+        }
+      }
+    } catch (err) {
+      console.warn("[ServerStore] MongoDB findDocumentAsync error:", err);
+    }
+
+    return undefined;
   }
 
   deleteDocument(id: string, userId?: string): boolean {
     const initialLength = this.documents.length;
     this.documents = this.documents.filter((d) => d.id !== id || (userId && d.userId !== userId));
     return this.documents.length < initialLength;
+  }
+
+  async deleteDocumentAsync(id: string, userId?: string): Promise<boolean> {
+    const deletedLocally = this.deleteDocument(id, userId);
+    try {
+      const col = await getCollection("documents");
+      if (col) {
+        await col.deleteOne({ $or: [{ id: id }, { materialId: id }] });
+      }
+    } catch (err) {
+      console.warn("[ServerStore] MongoDB deleteDocumentAsync error:", err);
+    }
+    return deletedLocally;
   }
 
   // Quiz Attempts & Progress

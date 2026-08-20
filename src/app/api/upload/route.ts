@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
       };
 
       serverState.addDocument(newDoc);
+      await serverState.addDocumentAsync(newDoc);
 
       const fullContent = newDoc.chunks.map((c) => c.text).join("\n\n");
 
@@ -78,6 +79,7 @@ export async function POST(req: NextRequest) {
         },
         material: {
           id: newDoc.id,
+          materialId: newDoc.id,
           name: newDoc.title,
           title: newDoc.title,
           type: newDoc.sourceType,
@@ -365,7 +367,7 @@ export async function POST(req: NextRequest) {
       error
     };
 
-    serverState.addDocument(newDoc);
+    await serverState.addDocumentAsync(newDoc);
 
     const fullContent = newDoc.chunks.map((c) => c.text).join("\n\n");
 
@@ -384,6 +386,7 @@ export async function POST(req: NextRequest) {
       },
       material: {
         id: newDoc.id,
+        materialId: newDoc.id,
         name: newDoc.title,
         title: newDoc.title,
         type: newDoc.sourceType,
@@ -409,7 +412,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const userId = await AuthService.getUserIdFromRequest(req);
-  const rawDocs = serverState.getDocuments(userId);
+  const rawDocs = await serverState.getDocumentsAsync(userId);
 
   // Self-heal any stored doc containing raw PDF bytes
   const sanitizedDocs = rawDocs.map((doc) => ({

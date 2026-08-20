@@ -18,7 +18,7 @@ export async function POST(
       return NextResponse.json({ error: "Query parameter is required." }, { status: 400 });
     }
 
-    const doc = serverState.findDocument(id, userId) || serverState.findDocument(id);
+    const doc = (await serverState.findDocumentAsync(id, userId)) || (await serverState.findDocumentAsync(id));
     if (!doc) {
       return NextResponse.json({ error: "Material not found." }, { status: 404 });
     }

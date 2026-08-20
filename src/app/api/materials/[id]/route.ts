@@ -16,8 +16,8 @@ export async function GET(
       return NextResponse.json({ success: false, error: "Material ID is required." }, { status: 400 });
     }
 
-    // Lookup material: try user-filtered lookup first, then fallback to document ID
-    const doc = serverState.findDocument(id, userId) || serverState.findDocument(id);
+    // Lookup material: try user-filtered lookup first, then fallback to document ID across serverless lambdas/MongoDB
+    const doc = (await serverState.findDocumentAsync(id, userId)) || (await serverState.findDocumentAsync(id));
     if (!doc) {
       return NextResponse.json({ success: false, error: "Material not found." }, { status: 404 });
     }
@@ -33,6 +33,7 @@ export async function GET(
       success: true,
       material: {
         id: doc.id,
+        materialId: doc.id,
         name: doc.title,
         title: doc.title,
         type: doc.sourceType,
@@ -59,7 +60,7 @@ export async function DELETE(
     const userId = await AuthService.getUserIdFromRequest(req);
     const { id } = await params;
 
-    const deleted = serverState.deleteDocument(id, userId);
+    const deleted = await serverState.deleteDocumentAsync(id, userId);
     if (!deleted) {
       return NextResponse.json({ success: false, error: "Material not found or unauthorized." }, { status: 404 });
     }
