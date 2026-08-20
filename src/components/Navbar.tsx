@@ -11,7 +11,7 @@ export function Navbar() {
   const [isHovered, setIsHovered] = useState(false);
 
   const navLinks = [
-    { name: "Student Workspace", href: "/student" },
+    { name: "Student Workspace", href: "/#student" },
     { name: "How it works", href: "#how-it-works" },
     { name: "Pricing", href: "#pricing" },
   ];
@@ -54,23 +54,13 @@ export function Navbar() {
             : "bg-slate-900/5 dark:bg-white/5 border-slate-900/10 dark:border-white/10"
         }`}>
           {navLinks.map((link) => (
-            link.name === "Student Workspace" ? (
-              <Link
-                key={link.name}
-                href={link.href}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white/80 dark:hover:bg-slate-800/80 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-              >
-                {link.name}
-              </Link>
-            ) : (
-              <a
-                key={link.name}
-                href={link.href}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white/80 dark:hover:bg-slate-800/80 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-              >
-                {link.name}
-              </a>
-            )
+            <a
+              key={link.name}
+              href={link.href}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white/80 dark:hover:bg-slate-800/80 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            >
+              {link.name}
+            </a>
           ))}
         </nav>
 
@@ -78,13 +68,13 @@ export function Navbar() {
         <div className="hidden md:flex items-center gap-3">
           <ThemeToggle />
 
-          <Link
-            href="/student"
+          <a
+            href="/#student"
             className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#3157D5] dark:bg-[#4F8CFF] hover:bg-[#2848b8] transition-all cursor-pointer shadow-xs"
           >
             <span>Open Student Workspace</span>
             <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+          </a>
         </div>
 
         {/* Mobile Menu Toggle */}
@@ -122,14 +112,14 @@ export function Navbar() {
                 </a>
               ))}
               <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-3">
-                <Link
-                  href="/student"
+                <a
+                  href="/#student"
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-base font-bold text-white bg-[#3157D5] dark:bg-[#4F8CFF] shadow-md cursor-pointer"
                 >
                   <span>Open Student Workspace</span>
                   <ArrowRight className="w-4 h-4" />
-                </Link>
+                </a>
               </div>
             </div>
           </motion.div>
