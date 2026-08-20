@@ -30,10 +30,13 @@ export interface ActiveQuizState {
 export interface TutoringSessionState {
   currentTopic: string | null;
   currentConcept: string | null;
+  lastExplanation?: string | null;
   pendingQuestion: string | null;
   pendingQuestionType: "UNDERSTANDING_CHECK" | "KNOWLEDGE_CHECK" | null;
   tutorState: TutorState;
   sessionId: string;
+  retryCount?: number;
+  lastEvaluationResult?: "CORRECT" | "PARTIAL" | "INCORRECT" | null;
   activeQuiz?: ActiveQuizState | null;
 }
 

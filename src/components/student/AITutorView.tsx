@@ -160,9 +160,6 @@ export function AITutorView({ onDeductCredits, isStandalone = false }: AITutorVi
     const textToSend = queryText || inputQuery;
     if (!textToSend.trim()) return;
 
-    const hasCredits = onDeductCredits(10);
-    if (!hasCredits) return;
-
     const userMsg: ChatMessage = {
       id: `user_${Date.now()}`,
       sender: "user",
@@ -185,7 +182,8 @@ export function AITutorView({ onDeductCredits, isStandalone = false }: AITutorVi
           mode: selectedMode,
           persona: isStandalone ? "standalone" : persona,
           isStandalone,
-          conversationHistory: updatedMessages.slice(-8).map((m) => ({ sender: m.sender, content: m.text })),
+          conversationId: isStandalone ? "standalone_chat_session" : `tutor_${persona}_session`,
+          conversationHistory: updatedMessages.slice(-10).map((m) => ({ sender: m.sender, content: m.text })),
           memoryContext: "Prefers intuitive explanations with real-world examples"
         })
       });

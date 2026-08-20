@@ -2,13 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { GeminiAIService } from "@/lib/services/ai-service";
 import { AuthService } from "@/lib/services/auth-service";
 import { getDb } from "@/lib/db/mongodb";
-import { UserDoc, MessageDoc } from "@/lib/db/models";
+import { MessageDoc } from "@/lib/db/models";
 
 export async function POST(req: NextRequest) {
   try {
     const userId = await AuthService.getUserIdFromRequest(req);
     const body = await req.json();
-    const { query, mode, persona, isStandalone, conversationId, memoryContext, documentId } = body;
+    const {
+      query,
+      mode,
+      persona,
+      isStandalone,
+      conversationId,
+      memoryContext,
+      conversationHistory,
+      documentId
+    } = body;
 
     if (!query || typeof query !== "string") {
       return NextResponse.json({ error: "Query is required." }, { status: 400 });
@@ -16,22 +25,9 @@ export async function POST(req: NextRequest) {
 
     const selectedPersona = persona === "standalone" || isStandalone ? "standalone" : persona === "professional" ? "professional" : "friendly";
     const selectedMode = mode || "Explain";
-    const activeConvId = conversationId || "default_session";
+    const activeConvId = conversationId || (userId ? `conv_${userId}_tutor` : "default_session");
 
-    // Deduct credits if DB is available
     const db = await getDb();
-    if (db) {
-      const user = (await db.collection("users").findOne({ clerkUserId: userId })) as UserDoc | null;
-      const currentCredits = user?.credits ?? 100;
-      if (currentCredits < 10) {
-        return NextResponse.json(
-          { error: "Insufficient credits. Please upgrade your plan or purchase additional credits." },
-          { status: 403 }
-        );
-      }
-
-      await db.collection("users").updateOne({ clerkUserId: userId }, { $inc: { credits: -10 } });
-    }
 
     // Save student user message
     if (db && activeConvId) {
@@ -43,7 +39,7 @@ export async function POST(req: NextRequest) {
         content: query,
         timestamp: new Date().toISOString(),
       };
-      await db.collection("messages").insertOne(userMsgDoc);
+      await db.collection("messages").insertOne(userMsgDoc).catch(console.error);
     }
 
     const tutorResponse = await GeminiAIService.generateTutorResponse(
@@ -51,7 +47,7 @@ export async function POST(req: NextRequest) {
       selectedMode,
       selectedPersona,
       memoryContext,
-      undefined,
+      conversationHistory,
       activeConvId,
       documentId,
       userId
@@ -67,7 +63,7 @@ export async function POST(req: NextRequest) {
         content: tutorResponse.responseText,
         timestamp: new Date().toISOString(),
       };
-      await db.collection("messages").insertOne(aiMsgDoc);
+      await db.collection("messages").insertOne(aiMsgDoc).catch(console.error);
     }
 
     return NextResponse.json({
@@ -75,7 +71,7 @@ export async function POST(req: NextRequest) {
       responseText: tutorResponse.responseText,
       codeSnippet: tutorResponse.codeSnippet,
       persona: selectedPersona,
-      creditsDeducted: 10,
+      creditsDeducted: 0,
     });
   } catch (error) {
     console.error("Error in /api/tutor route:", error);

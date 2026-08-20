@@ -7,6 +7,8 @@ export interface IntentResult {
     | "EXPLICIT_NEW_TOPIC"
     | "UNDERSTANDING_CONFIRMED"
     | "UNDERSTANDING_REJECTED"
+    | "FOLLOW_UP_EXAMPLE"
+    | "FOLLOW_UP_DEEPER"
     | "KNOWLEDGE_ANSWER"
     | "NEXT_TOPIC_CONFIRMATION"
     | "NEXT_TOPIC_DECLINED"
@@ -33,65 +35,100 @@ export class GeminiAIService {
       .trim();
   }
 
-  private static isCasualOrGreeting(textLower: string): boolean {
-    const clean = textLower.replace(/[^a-z\s]/g, "").trim();
-    const casualWords = [
+  public static isCasualOrGreeting(textLower: string): boolean {
+    const clean = textLower.replace(/[^a-z0-9\s]/gi, "").trim().toLowerCase();
+    const casualGreetings = [
       "hi", "hello", "hey", "hy", "hyy", "hii", "hlo", "how are you", "good morning",
       "good evening", "good afternoon", "whats up", "what up", "thanks", "thank you",
-      "cool", "fine", "nice", "awesome", "great"
+      "thx", "tysm", "cool", "nice", "awesome", "great"
     ];
-    return casualWords.includes(clean);
+    return casualGreetings.includes(clean);
   }
 
-  // Natural ChatGPT-Style Standalone AI Assistant handler
+  // Standalone ChatGPT-style Assistant for general chatbot mode (when persona === 'standalone')
   private static handleStandaloneChatGptStyleAssistant(query: string, persona?: string): string | null {
+    if (persona !== "standalone") return null;
+
     const qLower = query.toLowerCase().trim();
 
     if (qLower === "hi" || qLower === "hello" || qLower === "hey" || qLower === "hy") {
-      return "Hey! What's up?";
+      return "Hey! How can I help you today?";
     }
 
     if (qLower.includes("how are you")) {
       return "I'm good! What's going on with you?";
     }
 
-    if (qLower.includes("confused") || qLower.includes("yaar im so confused") || qLower.includes("im confused") || qLower.includes("i am so confused")) {
-      return "Why are you so confused? Tell me what's going on. I'll help you figure it out.";
-    }
-
-    if (qLower.includes("bad day") || qLower.includes("having a bad day")) {
-      return "Ah, that sounds rough. What happened?";
-    }
-
-    if (qLower.includes("bored") || qLower.includes("im bored") || qLower.includes("i am bored")) {
-      return "Boredom strikes! We can chat about cool tech, solve a riddle, or I can tell you a funny joke. What sounds fun?";
+    if (qLower.includes("confused") || qLower.includes("im confused") || qLower.includes("i am confused")) {
+      return "Why are you confused? Tell me what's going on. I'll help you figure it out.";
     }
 
     if (qLower.includes("joke") || qLower.includes("tell me a joke")) {
       return "Why do programmers prefer dark mode? Because light attracts bugs!";
     }
 
-    if (qLower.includes("what is a lab") || qLower === "what is a lab?" || qLower === "what is lab") {
-      return "A lab, short for laboratory, is a place where experiments, research, testing, or practical work are carried out.";
-    }
-
-    if (qLower.includes("dont understand react") || qLower.includes("don't understand react")) {
-      return "No worries. React can feel confusing at first. Tell me which part you're stuck on, or I can explain the whole thing from the beginning.";
-    }
-
-    if (qLower.includes("can you explain react") || qLower.includes("explain react")) {
-      return "Yeah, of course. React is a JavaScript library used to build interactive user interfaces. If you want, I can explain it with a simple example too.";
-    }
-
-    if (qLower.includes("what is python") || qLower === "what is python?") {
-      return "Python is a popular programming language known for its simple, readable syntax. It's widely used for web development, automation, data science, AI, and more.";
-    }
-
-    if (persona === "standalone" && (qLower.startsWith("hi") || qLower.startsWith("hey") || qLower.includes("thanks"))) {
+    if (qLower.startsWith("hi") || qLower.startsWith("hey") || qLower.includes("thanks")) {
       return "Hey! How can I help you today?";
     }
 
     return null;
+  }
+
+  public static isShortConfirmation(textLower: string): boolean {
+    const clean = textLower.replace(/[^a-z0-9\s]/gi, "").trim().toLowerCase();
+    const confirmations = [
+      "yes", "yeah", "yep", "yup", "sure", "okay", "okk", "ok", "got it", "i got it",
+      "makes sense", "i understand", "understood", "clear", "i get it", "continue",
+      "go ahead", "yes please", "yess", "yesss", "alright", "all good", "fine",
+      "haan", "ha", "haa", "haanji", "samajh aa gaya", "samajh gaya", "samajh gayi",
+      "theek hai", "accha", "sahi hai", "aage batao", "comfortable", "yes i am",
+      "yes it does", "i am comfortable", "totally", "of course", "definitely"
+    ];
+    return confirmations.includes(clean) || clean.startsWith("yes ") || clean.startsWith("haan ");
+  }
+
+  public static isShortNegation(textLower: string): boolean {
+    const clean = textLower.replace(/[^a-z0-9\s]/gi, "").trim().toLowerCase();
+    const negations = [
+      "no", "nope", "nah", "not really", "i dont understand", "i don't understand",
+      "dont understand", "i dont get it", "im confused", "i am confused", "confused",
+      "explain again", "what do you mean", "can you explain again", "still confused",
+      "not clear", "nahi", "nahi samajh aaya", "samajh nahi aaya", "phir se samjhao",
+      "kuch nahi samjha", "nahi samjha", "no i don't", "no i dont", "not comfortable"
+    ];
+    return negations.includes(clean) || clean.startsWith("no ") || clean.startsWith("nahi ");
+  }
+
+  public static isFollowUpExample(textLower: string): boolean {
+    const clean = textLower.replace(/[^a-z0-9\s]/gi, "").trim().toLowerCase();
+    return (
+      clean.includes("give an example") ||
+      clean.includes("give example") ||
+      clean.includes("give me an example") ||
+      clean.includes("example please") ||
+      clean.includes("can you give an example") ||
+      clean.includes("show an example") ||
+      clean.includes("show code") ||
+      clean.includes("code example") ||
+      clean === "example" ||
+      clean === "examples"
+    );
+  }
+
+  public static isFollowUpReasonOrDeeper(textLower: string): boolean {
+    const clean = textLower.replace(/[^a-z0-9\s]/gi, "").trim().toLowerCase();
+    return (
+      clean === "why" ||
+      clean === "why?" ||
+      clean === "how" ||
+      clean === "how?" ||
+      clean.startsWith("why ") ||
+      clean.startsWith("how ") ||
+      clean.includes("explain more") ||
+      clean.includes("tell me more") ||
+      clean.includes("dive deeper") ||
+      clean.includes("what does that mean")
+    );
   }
 
   // Extract explicit topic from user query
@@ -108,14 +145,22 @@ export class GeminiAIService {
       /give\s+me\s+examples?\s+of\s+([a-z0-9\s]+)/i,
       /give\s+an?\s+example\s+of\s+([a-z0-9\s]+)/i,
       /explain\s+([a-z0-9\s]+)/i,
+      /teach\s+me\s+([a-z0-9\s]+)/i,
       /what\s+is\s+([a-z0-9\s]+)/i,
+      /what\s+are\s+([a-z0-9\s]+)/i,
+      /tell\s+me\s+about\s+([a-z0-9\s]+)/i,
+      /how\s+does\s+([a-z0-9\s]+)\s+work/i,
+      /how\s+do\s+([a-z0-9\s]+)\s+work/i,
+      /i\s+want\s+to\s+learn\s+([a-z0-9\s]+)/i
     ];
 
     for (const pattern of patterns) {
       const match = text.match(pattern);
       if (match && match[1]) {
-        const extracted = match[1].replace(/\b(please|thanks|now|today|from this source|from pdf|from material)\b/gi, "").trim();
-        if (extracted.length > 0 && extracted !== "this source" && extracted !== "this pdf") {
+        const extracted = match[1]
+          .replace(/\b(please|thanks|now|today|from this source|from pdf|from material|clearly|simply|with example|in detail)\b/gi, "")
+          .trim();
+        if (extracted.length > 0 && extracted !== "this source" && extracted !== "this pdf" && extracted !== "it" && extracted !== "that" && extracted !== "more") {
           return extracted.charAt(0).toUpperCase() + extracted.slice(1);
         }
       }
@@ -138,6 +183,7 @@ export class GeminiAIService {
 
     const isExplicitRequest =
       textLower.startsWith("what is") ||
+      textLower.startsWith("what are") ||
       textLower.startsWith("explain") ||
       textLower.startsWith("tell me about") ||
       textLower.startsWith("how does") ||
@@ -146,7 +192,6 @@ export class GeminiAIService {
       textLower.includes("want to learn") ||
       textLower.startsWith("teach me") ||
       textLower.includes("quiz me") ||
-      textLower.includes("example") ||
       textLower.includes("topic-") ||
       textLower.includes("topic:");
 
@@ -186,11 +231,11 @@ export class GeminiAIService {
     if (textLower.includes("oops") || textLower.includes("object oriented")) return { topic: "Oops", concept: "Oops" };
 
     const cleaned = text
-      .replace(/\b(give me an example of|give me examples of|give me examples for|give example|quiz me for the topic|quiz me on|quiz me about|topic-|topic:|what is|explain|tell me about|how does|how do|i want to learn)\b/gi, "")
+      .replace(/\b(give me an example of|give me examples of|give me examples for|give example|quiz me for the topic|quiz me on|quiz me about|topic-|topic:|what is|what are|explain|teach me|tell me about|how does|how do|i want to learn)\b/gi, "")
       .replace(/\?/g, "")
       .trim();
 
-    if (cleaned.length > 0 && !cleaned.includes("this source") && !cleaned.includes("this pdf")) {
+    if (cleaned.length > 0 && !cleaned.includes("this source") && !cleaned.includes("this pdf") && cleaned !== "it" && cleaned !== "that") {
       const cap = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
       return { topic: cap, concept: cap };
     }
@@ -198,60 +243,57 @@ export class GeminiAIService {
     return null;
   }
 
-  private static isShortConfirmation(textLower: string): boolean {
-    const clean = textLower.replace(/[^a-z\s]/g, "").trim();
-    return ["yes", "yeah", "yep", "yup", "sure", "okay", "ok", "got it", "makes sense", "i understand", "understood", "clear", "i get it"].includes(clean);
-  }
-
-  private static isShortNegation(textLower: string): boolean {
-    const clean = textLower.replace(/[^a-z\s]/g, "").trim();
-    return ["no", "nope", "not really", "i dont understand", "i dont get it", "im confused", "confused", "explain again", "what do you mean"].includes(clean);
-  }
-
+  // Pedagogical Intent Classifier
   private static classifyIntent(
     query: string,
-    session: TutoringSessionState
+    session: TutoringSessionState,
+    history?: Array<{ sender: string; content: string }>
   ): IntentResult {
     const qLower = query.toLowerCase().trim();
 
-    if (session.tutorState === "WAITING_FOR_UNDERSTANDING") {
+    // 1. If user confirms understanding (e.g. "yes", "okk", "haan", "understood", "continue")
+    if (this.isShortConfirmation(qLower)) {
+      if (
+        session.tutorState === "WAITING_FOR_UNDERSTANDING" ||
+        session.tutorState === "INITIAL_EXPLANATION" ||
+        session.currentTopic
+      ) {
+        return { intent: "UNDERSTANDING_CONFIRMED", topic: session.currentTopic, concept: session.currentConcept };
+      }
+    }
+
+    // 2. If user rejects understanding or is confused (e.g. "no", "not really", "im confused", "nahi samjha")
+    if (this.isShortNegation(qLower)) {
+      if (
+        session.tutorState === "WAITING_FOR_UNDERSTANDING" ||
+        session.tutorState === "INITIAL_EXPLANATION" ||
+        session.currentTopic
+      ) {
+        return { intent: "UNDERSTANDING_REJECTED", topic: session.currentTopic, concept: session.currentConcept };
+      }
+    }
+
+    // 3. If user is in the middle of answering a concept-check question
+    if (session.tutorState === "WAITING_FOR_KNOWLEDGE_ANSWER" && session.pendingQuestion) {
       const explicitNew = this.detectExplicitConcept(query);
-      if (explicitNew) {
+      // Only switch topic if user explicitly starts a new "Explain [Other Topic]" command
+      if (explicitNew && (qLower.startsWith("what is") || qLower.startsWith("explain") || qLower.startsWith("teach me"))) {
         return { intent: "EXPLICIT_NEW_TOPIC", topic: explicitNew.topic, concept: explicitNew.concept };
       }
-      if (this.isShortConfirmation(qLower)) {
-        return { intent: "UNDERSTANDING_CONFIRMED", topic: null, concept: null };
-      }
-      if (this.isShortNegation(qLower)) {
-        return { intent: "UNDERSTANDING_REJECTED", topic: null, concept: null };
-      }
+      return { intent: "KNOWLEDGE_ANSWER", topic: session.currentTopic, concept: session.currentConcept };
     }
 
-    if (session.tutorState === "WAITING_FOR_KNOWLEDGE_ANSWER") {
-      const explicitNew = this.detectExplicitConcept(query);
-      if (explicitNew && (qLower.startsWith("what is") || qLower.startsWith("explain") || qLower.includes("want to learn"))) {
-        return { intent: "EXPLICIT_NEW_TOPIC", topic: explicitNew.topic, concept: explicitNew.concept };
-      }
-      if (this.isCasualOrGreeting(qLower)) {
-        return { intent: "CASUAL", topic: null, concept: null };
-      }
-      return { intent: "KNOWLEDGE_ANSWER", topic: null, concept: null };
+    // 4. If user asks for an example for current topic
+    if (this.isFollowUpExample(qLower)) {
+      return { intent: "FOLLOW_UP_EXAMPLE", topic: session.currentTopic, concept: session.currentConcept };
     }
 
-    if (session.tutorState === "WAITING_FOR_NEXT_TOPIC" || session.tutorState === "SESSION_COMPLETE") {
-      const explicitNew = this.detectExplicitConcept(query);
-      if (explicitNew) {
-        return { intent: "EXPLICIT_NEW_TOPIC", topic: explicitNew.topic, concept: explicitNew.concept };
-      }
-      if (this.isShortConfirmation(qLower)) {
-        return { intent: "NEXT_TOPIC_CONFIRMATION", topic: null, concept: null };
-      }
+    // 5. If user asks "why?" or "how?" or "explain more" for current topic
+    if (this.isFollowUpReasonOrDeeper(qLower)) {
+      return { intent: "FOLLOW_UP_DEEPER", topic: session.currentTopic, concept: session.currentConcept };
     }
 
-    if (this.isCasualOrGreeting(qLower)) {
-      return { intent: "CASUAL", topic: null, concept: null };
-    }
-
+    // 6. Explicit New Topic Detection
     const explicitConcept = this.detectExplicitConcept(query);
     if (explicitConcept) {
       return {
@@ -261,135 +303,374 @@ export class GeminiAIService {
       };
     }
 
+    // 7. If session was already complete and user responds with confirmation / next topic
+    if (session.tutorState === "SESSION_COMPLETE" || session.tutorState === "WAITING_FOR_NEXT_TOPIC") {
+      if (this.isShortConfirmation(qLower)) {
+        return { intent: "NEXT_TOPIC_CONFIRMATION", topic: null, concept: null };
+      }
+    }
+
+    // 8. If nothing active and it's a greeting
+    if (this.isCasualOrGreeting(qLower) && !session.currentTopic) {
+      return { intent: "GREETING", topic: null, concept: null };
+    }
+
+    // 9. If active topic exists and user sends descriptive text, evaluate as knowledge answer or topic response
+    if (session.currentTopic) {
+      if (session.tutorState === "WAITING_FOR_UNDERSTANDING") {
+        // If they send explanation text instead of simple yes, treat as understanding confirmed + answer
+        return { intent: "KNOWLEDGE_ANSWER", topic: session.currentTopic, concept: session.currentConcept };
+      }
+      return { intent: "KNOWLEDGE_ANSWER", topic: session.currentTopic, concept: session.currentConcept };
+    }
+
     return { intent: "CASUAL", topic: null, concept: null };
   }
 
-  // Factually accurate definition map (0 GENERIC FALLBACK DEFINITIONS!)
-  private static getFactualDefinition(concept: string): string {
-    const cLower = concept.toLowerCase();
-
-    if (cLower === "javascript" || cLower === "js") {
-      return "JavaScript is a high-level, interpreted programming language essential for dynamic web development, running both in web browsers and on servers via Node.js.";
-    }
-    if (cLower === "ai" || cLower === "artificial intelligence") {
-      return "Artificial Intelligence (AI) is the simulation of human intelligence by computer systems, enabling machines to learn, reason, perceive, and solve complex problems.";
-    }
-    if (cLower === "global warming" || cLower === "climate change") {
-      return "Global warming is the long-term rise in Earth's average temperature, mainly caused by the buildup of greenhouse gases from human activities.";
-    }
-    if (cLower === "oxygen") {
-      return "Oxygen is a chemical element with symbol O and atomic number 8, essential for the respiration of most living organisms on Earth.";
-    }
-    if (cLower === "mongodb") {
-      return "MongoDB is a NoSQL database that stores data in flexible, JSON-like documents instead of traditional rows and tables.";
-    }
-    if (cLower === "java") {
-      return "Java is a class-based, object-oriented programming language designed to run anywhere using the Java Virtual Machine (JVM), widely used for enterprise software and Android apps.";
-    }
-    if (cLower === "react") {
-      return "React is a JavaScript library for building interactive user interfaces from reusable components.";
-    }
-    if (cLower === "python") {
-      return "Python is a high-level, general-purpose programming language known for its clear, readable syntax and broad range of uses.";
-    }
-    if (cLower === "python loops" || cLower === "python loop") {
-      return "A loop in Python is used to repeat a block of code multiple times, such as iterating over items in a list or running while a condition is true.";
-    }
-    if (cLower === "sql") {
-      return "SQL (Structured Query Language) is a language used to query, manage, and manipulate data stored in relational databases.";
-    }
-    if (cLower === "database") {
-      return "A database is an organized collection of structured data stored electronically for easy access and management.";
-    }
-    if (cLower === "database normalization") {
-      return "Database normalization is the process of organizing data in a database to reduce redundancy and improve data integrity.";
-    }
-    if (cLower === "binary search") {
-      return "Binary search is an efficient algorithm that finds the position of a target value within a sorted array by repeatedly halving the search space.";
-    }
-    if (cLower === "tree") {
-      return "A Tree is a hierarchical non-linear data structure consisting of nodes connected by edges, with a top root node and child nodes.";
-    }
-    if (cLower === "oops") {
-      return "Object-Oriented Programming (OOP) is a programming paradigm based on the concept of objects containing data fields and methods.";
-    }
-    if (cLower === "recursion") {
-      return "Recursion is a programming technique where a function calls itself to solve smaller instances of the same problem until a base condition is met.";
-    }
-    if (cLower === "photosynthesis") {
-      return "Photosynthesis is the process by which green plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar.";
-    }
-    if (cLower === "gravity") {
-      return "Gravity is a fundamental physical force that attracts objects with mass toward one another.";
-    }
-    if (cLower === "blockchain") {
-      return "Blockchain is a decentralized, distributed digital ledger that securely records transactions across a network of computers.";
-    }
-
-    return `${concept} is a key concept in your study domain. It defines specific principles and structures designed to help you organize logic and solve practical problems effectively.`;
-  }
-
-  // Semantic Knowledge Answer Evaluator
-  private static evaluateStudentAnswer(
-    studentAnswer: string,
-    concept: string,
-    question: string
-  ): { isCorrect: boolean; feedback: string } {
-    const ansLower = studentAnswer.toLowerCase().trim();
+  // Factual definition repository for rich, pedagogical explanations
+  private static getFactualDefinition(concept: string, persona: "friendly" | "professional" = "friendly"): string {
     const cLower = concept.toLowerCase().trim();
 
+    if (cLower === "react" || cLower === "react.js" || cLower === "reactjs") {
+      return "React is an open-source JavaScript library developed by Meta for building dynamic, interactive user interfaces. Instead of manipulating the browser's DOM directly, React uses a Virtual DOM and a component-based architecture where you build independent, reusable UI pieces.";
+    }
+
+    if (cLower === "python") {
+      return "Python is a high-level, interpreted programming language renowned for its clean, readable syntax and versatility. It is widely used across web development, data science, machine learning, automation, and backend engineering.";
+    }
+
+    if (cLower === "python loops" || cLower === "python loop") {
+      return "In Python, loops allow you to execute a block of code repeatedly. Python provides `for` loops (used for iterating over sequences like lists, strings, or ranges) and `while` loops (which continue running as long as a specified condition remains True).";
+    }
+
     if (cLower === "javascript" || cLower === "js") {
-      if (ansLower.includes("web") || ansLower.includes("ui") || ansLower.includes("browser") || ansLower.includes("frontend") || ansLower.includes("node") || ansLower.includes("dynamic") || ansLower.includes("interface") || ansLower.includes("build")) {
-        return {
-          isCorrect: true,
-          feedback: `Exactly. That's correct. You understand the basic idea.\n\nLet me know if you need any other help.`
-        };
-      }
-      return {
-        isCorrect: false,
-        feedback: `Not quite. JavaScript is primarily used for creating dynamic web pages, interactive browser UIs, and backend services via Node.js.\n\nTry answering again: what is JavaScript mainly used for?`
-      };
+      return "JavaScript is a high-level, dynamic programming language that powers interactive web pages in the browser and scalable server-side applications via runtime environments like Node.js.";
     }
 
     if (cLower === "mongodb") {
-      if (ansLower.includes("image") || ansLower.includes("generate") || ansLower.includes("software logic")) {
+      return "MongoDB is a modern NoSQL document database. Instead of storing data in rigid rows and columns like traditional relational tables, MongoDB stores data in flexible, JSON-like BSON documents.";
+    }
+
+    if (cLower === "sql") {
+      return "SQL (Structured Query Language) is the standard language designed to store, manipulate, and retrieve structured data in relational database management systems like PostgreSQL, MySQL, and SQLite.";
+    }
+
+    if (cLower === "binary search") {
+      return "Binary Search is an efficient logarithmic divide-and-conquer search algorithm. Given a sorted array, it repeatedly divides the search interval in half by comparing the target value to the middle element, achieving O(log N) time complexity.";
+    }
+
+    if (cLower === "photosynthesis") {
+      return "Photosynthesis is the biological process by which green plants, algae, and certain bacteria convert sunlight, water, and carbon dioxide into chemical energy (glucose) and release oxygen into the atmosphere.";
+    }
+
+    if (cLower === "global warming" || cLower === "climate change") {
+      return "Global warming refers to the long-term increase in Earth's average surface temperature, primarily driven by human activities that release greenhouse gases (like CO2 and methane) that trap heat in the atmosphere.";
+    }
+
+    if (cLower === "ai" || cLower === "artificial intelligence") {
+      return "Artificial Intelligence (AI) is the branch of computer science dedicated to building systems capable of performing tasks that typically require human intelligence, including pattern recognition, natural language processing, reasoning, and problem-solving.";
+    }
+
+    return `${concept} is a fundamental concept in your field of study. It provides structured principles, methodologies, and tools to help you solve complex domain problems efficiently and systematically.`;
+  }
+
+  // Generate Concept Check Question
+  private static generateConceptCheckQuestion(topic: string, persona: "friendly" | "professional" = "friendly"): string {
+    const tLower = topic.toLowerCase().trim();
+
+    if (tLower.includes("react")) {
+      return "What is React, and why do we use it?";
+    }
+    if (tLower.includes("python loop")) {
+      return "What is the main purpose of a loop in Python, and what are the two main types of loops?";
+    }
+    if (tLower.includes("python")) {
+      return "What is Python, and what are some of its primary use cases?";
+    }
+    if (tLower.includes("javascript") || tLower === "js") {
+      return "What is JavaScript, and where can it run?";
+    }
+    if (tLower.includes("mongodb")) {
+      return "What kind of database is MongoDB, and how does it organize data?";
+    }
+    if (tLower.includes("sql")) {
+      return "What is SQL primarily used for in database systems?";
+    }
+    if (tLower.includes("binary search")) {
+      return "What prerequisite condition is required for Binary Search to work, and what makes it efficient?";
+    }
+    if (tLower.includes("photosynthesis")) {
+      return "What are the main inputs and outputs of the photosynthesis process?";
+    }
+
+    return `In your own words, what is ${topic}, and what is its primary purpose?`;
+  }
+
+  // Multi-Dimension Pedagogical Answer Evaluator
+  private static evaluateStudentAnswer(
+    studentAnswer: string,
+    topic: string,
+    question: string,
+    persona: "friendly" | "professional" = "friendly"
+  ): {
+    isCorrect: boolean;
+    isPartial: boolean;
+    feedback: string;
+    missingPoints?: string;
+  } {
+    const ans = studentAnswer.toLowerCase().trim();
+    const tLower = topic.toLowerCase().trim();
+    const wordCount = ans.split(/\s+/).filter(Boolean).length;
+
+    // A. REACT EVALUATION
+    if (tLower.includes("react")) {
+      const mentionsLibrary = ans.includes("library") || ans.includes("framework") || ans.includes("tool") || ans.includes("js") || ans.includes("javascript");
+      const mentionsUI = ans.includes("ui") || ans.includes("user interface") || ans.includes("frontend") || ans.includes("interface") || ans.includes("web") || ans.includes("website");
+      const mentionsComponents = ans.includes("component") || ans.includes("components") || ans.includes("reusable") || ans.includes("virtual dom") || ans.includes("state");
+
+      // Check completely wrong answer
+      if (ans.includes("database") || ans.includes("hardware") || ans.includes("operating system") || (wordCount < 3 && !mentionsUI && !mentionsLibrary)) {
         return {
           isCorrect: false,
-          feedback: `Not quite. MongoDB is a NoSQL database used to store and manage data, especially when the data structure is flexible.\n\nTry answering the question again: what is MongoDB mainly used for?`
+          isPartial: false,
+          feedback: "You're close, but there are a few mistakes in your answer. Go through the explanation once more, especially the part about components and UI, and try answering again."
         };
       }
-      if (ansLower.includes("database") || ansLower.includes("store") || ansLower.includes("nosql") || ansLower.includes("data") || ansLower.includes("json") || ansLower.includes("document")) {
+
+      // Check fully correct
+      if ((mentionsUI && mentionsComponents) || (mentionsLibrary && mentionsUI && wordCount >= 5)) {
+        const nextPrompt = persona === "friendly"
+          ? "Would you like to explore how React Components and Props work next, or is there another topic on your mind?"
+          : "Would you like to dive deeper into React Components & State management, or explore a different topic?";
         return {
           isCorrect: true,
-          feedback: `Exactly. That's correct. You understand the basic idea.\n\nLet me know if you need any other help.`
+          isPartial: false,
+          feedback: `Yes, that's correct! You've understood the concept well.\n\n${nextPrompt}`
         };
       }
+
+      // Partially correct
       return {
         isCorrect: false,
-        feedback: `Not quite. MongoDB is a NoSQL database used to store and manage data.\n\nTry answering again: what is MongoDB mainly used for?`
+        isPartial: true,
+        feedback: "You're on the right track! Your explanation is correct, but you're missing one important point: components help us build reusable UI pieces.\n\nWould you like to try answering again with that in mind?"
       };
     }
 
-    if (cLower === "react") {
-      if (ansLower.includes("ui") || ansLower.includes("interface") || ansLower.includes("component") || ansLower.includes("frontend") || ansLower.includes("web") || ansLower.includes("building")) {
+    // B. PYTHON LOOPS EVALUATION
+    if (tLower.includes("python loop")) {
+      const mentionsRepeat = ans.includes("repeat") || ans.includes("iterate") || ans.includes("multiple times") || ans.includes("loop") || ans.includes("running");
+      const mentionsTypes = (ans.includes("for") && ans.includes("while")) || ans.includes("for loop") || ans.includes("while loop");
+
+      if (ans.includes("database") || ans.includes("compiler") || wordCount < 3) {
         return {
-          isCorrect: true,
-          feedback: `Exactly. That's correct. You understand the basic idea.\n\nLet me know if you need any other help.`
+          isCorrect: false,
+          isPartial: false,
+          feedback: "You're close, but there are a few mistakes in your answer. Go through the explanation once more, especially the part about repeating code with for and while loops, and try answering again."
         };
       }
+
+      if (mentionsRepeat && mentionsTypes) {
+        return {
+          isCorrect: true,
+          isPartial: false,
+          feedback: "Yes, that's correct! You've understood the concept well.\n\nWould you like to see a practical example of nested loops in Python, or explore another topic?"
+        };
+      }
+
       return {
         isCorrect: false,
-        feedback: `Not quite. React is primarily used to build interactive user interfaces using reusable components.\n\nTry answering again: what is React mainly used for?`
+        isPartial: true,
+        feedback: "You're on the right track! Loops repeat code, but remember that Python primarily uses two types: `for` loops (for sequences) and `while` loops (based on conditions).\n\nWould you like to try answering again?"
+      };
+    }
+
+    // C. PYTHON EVALUATION
+    if (tLower.includes("python")) {
+      const mentionsLanguage = ans.includes("language") || ans.includes("programming") || ans.includes("code");
+      const mentionsUses = ans.includes("web") || ans.includes("ai") || ans.includes("data") || ans.includes("machine learning") || ans.includes("automation") || ans.includes("simple") || ans.includes("easy");
+
+      if (ans.includes("hardware") || ans.includes("database engine") || wordCount < 3) {
+        return {
+          isCorrect: false,
+          isPartial: false,
+          feedback: "You're close, but there are a few mistakes in your answer. Go through the explanation once more, especially the part about programming and its common applications, and try answering again."
+        };
+      }
+
+      if (mentionsLanguage && mentionsUses) {
+        return {
+          isCorrect: true,
+          isPartial: false,
+          feedback: "Yes, that's correct! You've understood the concept well.\n\nWould you like to learn about Python data structures like Lists and Dictionaries next?"
+        };
+      }
+
+      return {
+        isCorrect: false,
+        isPartial: true,
+        feedback: "You're on the right track! Python is a high-level programming language, and it's especially known for readable syntax used in AI, web dev, and automation.\n\nWould you like to try summarizing it again?"
+      };
+    }
+
+    // D. JAVASCRIPT EVALUATION
+    if (tLower.includes("javascript") || tLower === "js") {
+      const mentionsWeb = ans.includes("web") || ans.includes("browser") || ans.includes("frontend") || ans.includes("interactive") || ans.includes("dynamic") || ans.includes("node");
+
+      if (wordCount < 3 || ans.includes("hardware")) {
+        return {
+          isCorrect: false,
+          isPartial: false,
+          feedback: "You're close, but there are a few mistakes in your answer. Go through the explanation once more, especially the part about dynamic web development, and try answering again."
+        };
+      }
+
+      if (mentionsWeb && (ans.includes("browser") || ans.includes("node") || ans.includes("server") || ans.includes("pages"))) {
+        return {
+          isCorrect: true,
+          isPartial: false,
+          feedback: "Yes, that's correct! You've understood the concept well.\n\nWould you like to explore JavaScript Async/Await & Promises next?"
+        };
+      }
+
+      return {
+        isCorrect: false,
+        isPartial: true,
+        feedback: "You're on the right track! JavaScript is used for interactive web pages, but remember it also runs outside the browser on servers via Node.js.\n\nWould you like to try answering again?"
+      };
+    }
+
+    // E. GENERAL TOPIC EVALUATION
+    if (wordCount >= 6) {
+      return {
+        isCorrect: true,
+        isPartial: false,
+        feedback: `Yes, that's correct! You've understood the concept well.\n\nWould you like to explore a deeper aspect of ${topic}, or learn another topic?`
+      };
+    }
+
+    if (wordCount >= 3) {
+      return {
+        isCorrect: false,
+        isPartial: true,
+        feedback: `You're on the right track! Your answer touches on the key idea, but could you elaborate a bit more on how ${topic} is used practically?`
       };
     }
 
     return {
-      isCorrect: true,
-      feedback: `Exactly. That's correct. You understand the basic idea.\n\nLet me know if you need any other help.`
+      isCorrect: false,
+      isPartial: false,
+      feedback: `You're close, but there are a few mistakes in your answer. Go through the explanation once more and try answering again.`
     };
   }
 
-  // DYNAMIC MATERIAL-GROUNDED QUIZ QUESTION GENERATOR (STRICT GROUNDING!)
+  // Simplified Analogy Explanation for when user says "no" or is confused
+  private static getSimplerAnalogyExplanation(topic: string, persona: "friendly" | "professional" = "friendly"): string {
+    const tLower = topic.toLowerCase().trim();
+
+    if (tLower.includes("react")) {
+      return "No problem at all! Let's simplify it with an analogy:\n\nImagine building a webpage like assembling a Lego set. Instead of creating the whole page in one massive block, React lets you create small, reusable Lego bricks (called **components**) like a Button, a SearchBar, or a Header, and put them together.\n\nDoes that make sense? Are you comfortable with this concept?";
+    }
+
+    if (tLower.includes("python loop")) {
+      return "No problem at all! Let's simplify it:\n\nImagine you have a stack of 10 test papers to sign. Instead of writing 10 separate instructions to sign each paper, a loop simply says: *'For every paper in the stack, sign it.'* It repeats the same action until all papers are signed.\n\nDoes that make sense? Are you comfortable with this concept?";
+    }
+
+    if (tLower.includes("python")) {
+      return "No worries! Think of Python like plain English for computers. While some programming languages require complex syntax, Python is designed to be as readable and intuitive as everyday sentences.\n\nDoes that make sense? Are you comfortable with this concept?";
+    }
+
+    if (tLower.includes("binary search")) {
+      return "No problem! Imagine searching for a word in a dictionary. You don't read page 1 to 500 one by one. You open the dictionary right in the middle: if your word comes after, you discard the left half and repeat in the right half. That's exactly how Binary Search works!\n\nDoes that make sense? Are you comfortable with this concept?";
+    }
+
+    return `No problem at all! Let's look at ${topic} in simpler terms:\n\nThink of it as a blueprint that breaks down complex tasks into manageable steps so you can solve problems faster and without mistakes.\n\nDoes that make sense? Are you comfortable with this concept?`;
+  }
+
+  // Concrete Example Provider for when user asks "give an example"
+  private static getTopicExample(topic: string, persona: "friendly" | "professional" = "friendly"): string {
+    const tLower = topic.toLowerCase().trim();
+
+    if (tLower.includes("react")) {
+      return "Here's a concrete example in React:\n\n```jsx\nfunction WelcomeButton({ username }) {\n  return (\n    <button className=\"btn-primary\">\n      Hello, {username}!\n    </button>\n  );\n}\n```\n\nInstead of writing raw HTML over and over, you can reuse `<WelcomeButton username=\"Swati\" />` anywhere across your app.\n\nDoes that make sense? Are you comfortable with this concept?";
+    }
+
+    if (tLower.includes("python loop") || tLower.includes("python")) {
+      return "Here is a simple Python loop example:\n\n```python\nfruits = [\"Apple\", \"Banana\", \"Mango\"]\n\nfor fruit in fruits:\n    print(f\"I like {fruit}\")\n```\n\nThis loop runs 3 times, printing each item from the list automatically.\n\nDoes that make sense? Are you comfortable with this concept?";
+    }
+
+    if (tLower.includes("binary search")) {
+      return "Here is a quick Binary Search example:\n\nArray: `[10, 20, 30, 40, 50, 60, 70]`\nTarget: `50`\n\n1. Middle element is `40`.\n2. `50 > 40`, so we ignore the left half (`[10, 20, 30]`).\n3. In the right half (`[50, 60, 70]`), middle is `50` (Target found in just 2 steps!).\n\nDoes that make sense? Are you comfortable with this concept?";
+    }
+
+    return `Here is a practical example for **${topic}**:\n\nWhen developing a modern application, applying ${topic} allows you to isolate logic, eliminate redundant computation, and make your codebase predictable.\n\nDoes that make sense? Are you comfortable with this concept?`;
+  }
+
+  // Format tutor responses according to user's personalized explanation style preference (Mem0)
+  public static applyExplanationStyleFormat(
+    rawText: string,
+    style: "Bullet Points" | "Paragraphs" | "Short & Direct" | "Step-by-Step" = "Bullet Points",
+    customPreferences?: string[]
+  ): string {
+    if (!rawText) return "";
+
+    const tLower = rawText.toLowerCase().trim();
+    if (
+      tLower === "hey! how can i help you today?" ||
+      tLower === "hey! what's up?" ||
+      tLower.startsWith("you're welcome")
+    ) {
+      return rawText;
+    }
+
+    const endingQuestionMatch = rawText.match(/(\n\n)?(Does that make sense\? Are you comfortable with this concept\?|Does that make sense\?|What is .*|In your own words.*|Would you like to.*|Does this example help clarify.*)$/i);
+    const endingQuestion = endingQuestionMatch ? endingQuestionMatch[0].trim() : "";
+    const bodyText = endingQuestionMatch ? rawText.replace(endingQuestionMatch[0], "").trim() : rawText.trim();
+
+    const headerMatch = bodyText.match(/^###\s+[^\n]+\n\n/);
+    const header = headerMatch ? headerMatch[0] : "";
+    const contentOnly = headerMatch ? bodyText.replace(headerMatch[0], "").trim() : bodyText.trim();
+
+    let formattedBody = contentOnly;
+
+    // Do not bullet point short conversational feedback or question intros
+    const isShortConversational =
+      contentOnly.startsWith("Great!") ||
+      contentOnly.startsWith("Awesome!") ||
+      contentOnly.startsWith("Yes, that's correct") ||
+      contentOnly.startsWith("You're on the right track") ||
+      contentOnly.startsWith("You're close") ||
+      contentOnly.startsWith("No problem") ||
+      contentOnly.startsWith("No worries") ||
+      contentOnly.length < 80;
+
+    if (style === "Bullet Points" && !isShortConversational) {
+      if (!contentOnly.includes("- ") && !contentOnly.includes("• ") && !contentOnly.includes("```")) {
+        const sentences = contentOnly.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 3);
+        if (sentences.length > 2) {
+          const intro = sentences[0];
+          const bullets = sentences.slice(1).map((s) => `- ${s.replace(/^[-•*]\s*/, "")}`).join("\n");
+          formattedBody = `${intro}\n\n${bullets}`;
+        }
+      }
+    } else if (style === "Paragraphs") {
+      const cleanLines = contentOnly
+        .split("\n")
+        .map((line) => line.replace(/^(\d+\.|Step \d+:?|[-•*])\s*/i, "").trim())
+        .filter((line) => line.length > 0);
+      formattedBody = cleanLines.join(" ");
+    } else if (style === "Short & Direct" && !isShortConversational) {
+      const sentences = contentOnly.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 3);
+      if (sentences.length > 2) {
+        formattedBody = sentences.slice(0, 2).join(" ");
+      }
+    }
+
+    const fullContent = header ? `${header}${formattedBody}` : formattedBody;
+    return endingQuestion ? `${fullContent}\n\n${endingQuestion}` : fullContent;
+  }
+
+  // DYNAMIC MATERIAL-GROUNDED QUIZ QUESTION GENERATOR
   static async generateQuizFromDocument(
     docTitle: string,
     questionCount: number = 5,
@@ -447,91 +728,6 @@ Instructions:
     }
 
     const tLower = docTitle.toLowerCase().trim();
-
-    if (tLower.includes("python")) {
-      return [
-        {
-          id: "q1",
-          question: "What is a loop in Python mainly used for?",
-          options: [
-            "To repeat a block of code multiple times",
-            "To define a relational database table",
-            "To compile code to machine binary",
-            "To manage operating system memory"
-          ],
-          correctOptionIndex: 0,
-          explanation: "A loop in Python (for/while) repeats a block of code for iterations or while a condition is true."
-        },
-        {
-          id: "q2",
-          question: "Which keyword is used to define a function in Python?",
-          options: ["function", "def", "func", "fn"],
-          correctOptionIndex: 1,
-          explanation: "`def` is the standard keyword used to define functions in Python."
-        },
-        {
-          id: "q3",
-          question: "Which of the following built-in data types in Python is immutable?",
-          options: ["List", "Dictionary", "Tuple", "Set"],
-          correctOptionIndex: 2,
-          explanation: "Tuples are immutable sequences in Python; their elements cannot be altered after assignment."
-        },
-        {
-          id: "q4",
-          question: "Which function in Python returns the total number of items in a list?",
-          options: ["count()", "size()", "len()", "length()"],
-          correctOptionIndex: 2,
-          explanation: "`len()` is the built-in function to get list length in Python."
-        },
-        {
-          id: "q5",
-          question: "How do you start a single-line comment in Python?",
-          options: ["//", "#", "/*", "--"],
-          correctOptionIndex: 1,
-          explanation: "`#` is used to initiate a single-line comment in Python."
-        }
-      ].slice(0, questionCount);
-    }
-
-    if (tLower.includes("javascript") || tLower.includes("js")) {
-      return [
-        {
-          id: "q1",
-          question: "Which keyword is used to declare a block-scoped variable in JavaScript?",
-          options: ["var", "let", "define", "variable"],
-          correctOptionIndex: 1,
-          explanation: "`let` (and `const`) declare block-scoped variables in modern JavaScript."
-        },
-        {
-          id: "q2",
-          question: "What is the return type of `typeof null` in JavaScript?",
-          options: ["'null'", "'undefined'", "'object'", "'boolean'"],
-          correctOptionIndex: 2,
-          explanation: "In JavaScript, `typeof null` returns `'object'` due to a historical implementation detail."
-        },
-        {
-          id: "q3",
-          question: "Which built-in method parses a valid JSON string into a JavaScript object?",
-          options: ["JSON.stringify()", "JSON.parse()", "JSON.toObject()", "JSON.convert()"],
-          correctOptionIndex: 1,
-          explanation: "`JSON.parse()` deserializes a JSON string into a JavaScript object."
-        },
-        {
-          id: "q4",
-          question: "What does the `===` strict equality operator check in JavaScript?",
-          options: ["Only values", "Only data types", "Both value and data type", "Memory references"],
-          correctOptionIndex: 2,
-          explanation: "`===` checks both value equality and type equality without type coercion."
-        },
-        {
-          id: "q5",
-          question: "Which array method creates a new array with all elements that pass a test function?",
-          options: ["map()", "filter()", "forEach()", "reduce()"],
-          correctOptionIndex: 1,
-          explanation: "`filter()` creates a new array containing only elements that satisfy the predicate."
-        }
-      ].slice(0, questionCount);
-    }
 
     if (tLower.includes("react")) {
       return [
@@ -614,34 +810,11 @@ Instructions:
         ],
         correctOptionIndex: 1,
         explanation: `Proper application of ${docTitle} ensures system reliability and maintainable architecture.`
-      },
-      {
-        id: "q4",
-        question: `What type of architectural pattern is highlighted in ${docTitle}?`,
-        options: [
-          "Monolithic unindexed storage",
-          `Modular, decoupled design structure in ${docTitle}`,
-          "Direct hardware register write",
-          "Unbuffered stream pipeline"
-        ],
-        correctOptionIndex: 1,
-        explanation: `${docTitle} emphasizes modularity and clear component boundaries.`
-      },
-      {
-        id: "q5",
-        question: `How does ${docTitle} optimize runtime performance?`,
-        options: [
-          "By increasing CPU cycle wait times",
-          `By indexing data and minimizing redundant processing in ${docTitle}`,
-          "By bypassing validation checks"
-        ],
-        correctOptionIndex: 1,
-        explanation: `${docTitle} optimizes performance by avoiding redundant computation.`
       }
     ].slice(0, questionCount);
   }
 
-  // Parse user option selection from query (e.g. "A", "Q1-A", "Answer: A", "1. A", "Machine Learning")
+  // Parse user option selection from query
   private static parseUserOptionIndex(query: string, currentQuestion: QuizQuestion): number | null {
     const qLower = query.toLowerCase().trim();
 
@@ -659,248 +832,7 @@ Instructions:
     return null;
   }
 
-  // Generate Action Response (Strictly supporting 3 Modes: 'Explain', 'Quiz Me', 'Give Example')
-  static async generateActionResponse(
-    query: string,
-    action: AITutorMode,
-    persona: "friendly" | "professional" | "standalone",
-    session: TutoringSessionState,
-    documentId?: string,
-    userId?: string
-  ): Promise<{ responseText: string; codeSnippet?: string }> {
-    const qLower = query.toLowerCase().trim();
-
-    // 1. CHECK ACTIVE STATEFUL QUIZ SESSION FIRST
-    if (session.activeQuiz && session.activeQuiz.status === "active") {
-      const activeQuiz = session.activeQuiz;
-      const currentIdx = activeQuiz.currentQuestionIndex;
-      const currentQ = activeQuiz.questions[currentIdx];
-
-      if (currentQ) {
-        const selectedOptIdx = this.parseUserOptionIndex(query, currentQ);
-        if (selectedOptIdx !== null) {
-          const isCorrect = selectedOptIdx === currentQ.correctOptionIndex;
-          if (isCorrect) activeQuiz.score += 1;
-
-          const correctLetter = String.fromCharCode(65 + currentQ.correctOptionIndex);
-          const correctText = currentQ.options[currentQ.correctOptionIndex];
-
-          const feedbackText = isCorrect
-            ? `Correct! ${currentQ.explanation}`
-            : `Not quite. The correct answer is ${correctLetter}: "${correctText}". ${currentQ.explanation}`;
-
-          const nextIdx = currentIdx + 1;
-          activeQuiz.currentQuestionIndex = nextIdx;
-
-          if (nextIdx < activeQuiz.questions.length) {
-            const nextQ = activeQuiz.questions[nextIdx];
-            const responseText = `${feedbackText}\n\nScore: ${activeQuiz.score}/${nextIdx}\n\nLet's continue.\n\n` +
-              `**Question ${nextIdx + 1}**: ${nextQ.question}\n` +
-              nextQ.options.map((opt, oIdx) => `   ${String.fromCharCode(65 + oIdx)}. ${opt}`).join("\n") +
-              `\n\nReply with your answer (A, B, C, or D).`;
-
-            serverState.updateTutoringSessionState(session.sessionId, { activeQuiz });
-            return { responseText };
-          } else {
-            activeQuiz.status = "completed";
-            serverState.updateTutoringSessionState(session.sessionId, { activeQuiz });
-            serverState.addQuizAttempt({
-              topic: activeQuiz.topic,
-              score: activeQuiz.score,
-              total: activeQuiz.questions.length,
-              userId
-            });
-
-            const completionText = `${feedbackText}\n\n` +
-              `Great job! You completed the quiz.\n\n` +
-              `**Final Score**: ${activeQuiz.score} / ${activeQuiz.questions.length}\n` +
-              `**Correct**: ${activeQuiz.score}\n` +
-              `**Incorrect**: ${activeQuiz.questions.length - activeQuiz.score}\n\n` +
-              `Let me know if you'd like to learn something else.`;
-
-            return { responseText: completionText };
-          }
-        }
-      }
-    }
-
-    // 2. EXPLICIT TOPIC & MATERIAL ROUTING
-    const explicitTopicInQuery = this.detectExplicitTopicFromQuery(query);
-
-    const isMaterialExplicitRequest =
-      qLower.includes("from this pdf") ||
-      qLower.includes("from my pdf") ||
-      qLower.includes("from uploaded materials") ||
-      qLower.includes("from my materials") ||
-      qLower.includes("from this source") ||
-      qLower.includes("from source");
-
-    let selectedMaterialDoc = null;
-    if (documentId && userId) {
-      selectedMaterialDoc = serverState.findDocument(documentId, userId);
-    }
-
-    let finalTopic = "Python";
-    let retrievalMode: "TOPIC" | "MATERIAL" = "TOPIC";
-
-    if (explicitTopicInQuery) {
-      finalTopic = explicitTopicInQuery;
-      retrievalMode = "TOPIC";
-    } else if (isMaterialExplicitRequest && selectedMaterialDoc) {
-      finalTopic = selectedMaterialDoc.title;
-      retrievalMode = "MATERIAL";
-    } else if (session.currentTopic) {
-      finalTopic = session.currentTopic;
-      retrievalMode = "TOPIC";
-    }
-
-    console.log("[TUTOR ACTION DEBUG]", {
-      userMessage: query,
-      action,
-      explicitTopic: explicitTopicInQuery || null,
-      activeTopic: session.currentTopic || null,
-      selectedMaterialId: documentId || null,
-      selectedMaterialName: selectedMaterialDoc?.title || null,
-      retrievalMode,
-      retrievedSources: retrievalMode === "MATERIAL" ? (selectedMaterialDoc?.title || "Material") : "General Knowledge",
-      finalTopic,
-      finalContext: `Generating ${action} for topic: ${finalTopic}`
-    });
-
-    serverState.updateTutoringSessionState(session.sessionId || "default_session", {
-      currentTopic: finalTopic,
-      currentConcept: finalTopic
-    });
-
-    const header = persona === "standalone"
-      ? `### AI Tutor — ${action}: ${finalTopic}`
-      : persona === "friendly"
-      ? `### Aarav Mehta — ${action}: ${finalTopic} 😊`
-      : `### Riya Kapoor — ${action}: ${finalTopic} 🎓`;
-
-    // ACTION DISPATCHER FOR 3 MODES
-
-    // A. QUIZ ME MODE
-    if (action === "Quiz Me" || qLower.includes("quiz")) {
-      const materialText = selectedMaterialDoc ? selectedMaterialDoc.chunks.map((c) => c.text).join("\n\n") : undefined;
-      const questions = await this.generateQuizFromDocument(finalTopic, 5, "Medium", materialText);
-      
-      const newActiveQuiz: ActiveQuizState = {
-        status: "active",
-        topic: finalTopic,
-        questions,
-        currentQuestionIndex: 0,
-        score: 0
-      };
-
-      serverState.updateTutoringSessionState(session.sessionId || "default_session", {
-        activeQuiz: newActiveQuiz
-      });
-
-      const q1 = questions[0];
-      const quizIntro = `${header}\n\nHere is Question 1 of ${questions.length} on **${finalTopic}**:\n\n` +
-        `**Question 1**: ${q1.question}\n` +
-        q1.options.map((opt, oIdx) => `   ${String.fromCharCode(65 + oIdx)}. ${opt}`).join("\n") +
-        `\n\nReply with your answer (A, B, C, or D).`;
-
-      return { responseText: quizIntro };
-    }
-
-    // B. GIVE EXAMPLE MODE
-    if (action === "Give Example" || qLower.includes("example")) {
-      const tLower = finalTopic.toLowerCase();
-
-      if (tLower.includes("react")) {
-        return {
-          responseText: `${header}\n\nSure! Imagine you're building a shopping website. Instead of creating the entire page from scratch, React lets you create reusable components like ProductCard, Navbar, and Cart.`
-        };
-      }
-
-      if (tLower.includes("python loop") || tLower.includes("python loops") || tLower.includes("python")) {
-        return {
-          responseText: `${header}\n\nSure! Here is a simple Python loop example:\n\n\`\`\`python\nfor item in ["apple", "banana", "cherry"]:\n    print("I like", item)\n\`\`\`\n\nThis loop iterates over the list and prints each fruit one by one.`
-        };
-      }
-
-      if (tLower.includes("global warming") || tLower.includes("climate change")) {
-        return {
-          responseText: `${header}\n\nSure! A real-world example of global warming is the accelerating melting of polar ice caps and glaciers, leading to rising sea levels and flooding coastal cities worldwide.`
-        };
-      }
-
-      return {
-        responseText: `${header}\n\nSure! A practical real-world example of **${finalTopic}** is using structured design patterns to isolate state updates cleanly and avoid unintended side effects in production applications.`
-      };
-    }
-
-    // C. EXPLAIN MODE (Default)
-    const def = this.getFactualDefinition(finalTopic);
-    return { responseText: `${def}\n\nIs that clear so far?` };
-  }
-
-  // Format tutor responses according to user's personalized explanation style preference
-  public static applyExplanationStyleFormat(
-    rawText: string,
-    style: "Bullet Points" | "Paragraphs" | "Short & Direct" | "Step-by-Step" = "Bullet Points",
-    customPreferences?: string[]
-  ): string {
-    if (!rawText) return "";
-
-    const tLower = rawText.toLowerCase().trim();
-    if (
-      tLower === "hey! what's up?" ||
-      tLower === "hi! how can i help you?" ||
-      tLower.startsWith("you're welcome") ||
-      tLower.startsWith("i'm doing well")
-    ) {
-      return rawText;
-    }
-
-    const endingQuestionMatch = rawText.match(/(\n\n)?(Is that clear so far\?|Is that clearer\?|Let me know if you need any other help\.|Try answering again:.*|Reply with your answer.*)$/i);
-    const endingQuestion = endingQuestionMatch ? endingQuestionMatch[0].trim() : "";
-    const bodyText = endingQuestionMatch ? rawText.replace(endingQuestionMatch[0], "").trim() : rawText.trim();
-
-    const headerMatch = bodyText.match(/^###\s+[^\n]+\n\n/);
-    const header = headerMatch ? headerMatch[0] : "";
-    const contentOnly = headerMatch ? bodyText.replace(headerMatch[0], "").trim() : bodyText.trim();
-
-    let formattedBody = contentOnly;
-
-    if (style === "Bullet Points") {
-      if (!contentOnly.includes("- ") && !contentOnly.includes("• ")) {
-        const sentences = contentOnly.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 3);
-        if (sentences.length > 1) {
-          const intro = sentences[0];
-          const bullets = sentences.slice(1).map((s) => `- ${s.replace(/^[-•*]\s*/, "")}`).join("\n");
-          formattedBody = `${intro}\n\n${bullets}`;
-        } else {
-          formattedBody = `- ${contentOnly.replace(/^[-•*]\s*/, "")}`;
-        }
-      }
-    } else if (style === "Paragraphs") {
-      const cleanLines = contentOnly
-        .split("\n")
-        .map((line) => line.replace(/^(\d+\.|Step \d+:?|[-•*])\s*/i, "").trim())
-        .filter((line) => line.length > 0);
-      formattedBody = cleanLines.join(" ");
-    } else if (style === "Short & Direct") {
-      const sentences = contentOnly.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 3);
-      const shortSentences = sentences.slice(0, 2).map((s) => s.replace(/^(\d+\.|Step \d+:?|[-•*])\s*/i, "").trim());
-      formattedBody = shortSentences.join(" ");
-    } else if (style === "Step-by-Step") {
-      const sentences = contentOnly.split(/(?<=[.!?\n])\s+/).filter((s) => s.trim().length > 3);
-      if (sentences.length > 0) {
-        formattedBody = sentences
-          .map((s, idx) => `Step ${idx + 1}: ${s.replace(/^(\d+\.|Step \d+:?|[-•*])\s*/i, "").trim()}`)
-          .join("\n");
-      }
-    }
-
-    const fullContent = header ? `${header}${formattedBody}` : formattedBody;
-    return endingQuestion ? `${fullContent}\n\n${endingQuestion}` : fullContent;
-  }
-
-  // Standard Tutor Response generator
+  // Main Pedagogical Tutor Response Generator (TEACH → CONFIRM → ASK QUESTION → EVALUATE → CONTINUE)
   static async generateTutorResponse(
     query: string,
     mode: AITutorMode = "Explain",
@@ -915,123 +847,205 @@ Instructions:
     const userMem = serverState.getUserLearningMemory(userId);
     const qLower = query.toLowerCase().trim();
 
-    // Check Standalone ChatGPT-Style Assistant response first
-    const standaloneResponse = this.handleStandaloneChatGptStyleAssistant(query, persona);
-    if (standaloneResponse) {
-      return { responseText: standaloneResponse };
+    // 1. Standalone Assistant Handler (when persona is standalone)
+    if (persona === "standalone") {
+      const standaloneResponse = this.handleStandaloneChatGptStyleAssistant(query, persona);
+      if (standaloneResponse) {
+        return { responseText: standaloneResponse };
+      }
     }
 
-    let resultResponse: { responseText: string; codeSnippet?: string };
-
-    // Check active quiz session state OR mode actions
-    if (
-      (session.activeQuiz && session.activeQuiz.status === "active") ||
-      mode !== "Explain" ||
-      qLower.startsWith("quiz me") ||
-      qLower.startsWith("topic-") ||
-      qLower.startsWith("topic:") ||
-      qLower.startsWith("give example") ||
-      qLower.startsWith("give me an example") ||
-      qLower.startsWith("examples of") ||
-      qLower.startsWith("examples for")
-    ) {
-      resultResponse = await this.generateActionResponse(query, mode, persona, session, documentId, userId);
-    } else {
-      const intentResult = this.classifyIntent(query, session);
-
-      if (intentResult.intent === "GREETING" || intentResult.intent === "CASUAL") {
-        if (qLower.includes("thanks") || qLower.includes("thank you")) {
-          resultResponse = { responseText: "You're welcome! Let me know if you need anything else." };
-        } else {
-          resultResponse = {
-            responseText: persona === "standalone"
-              ? "Hey! What's up?"
-              : persona === "friendly"
-              ? "Hi! How can I help you?"
-              : "I'm doing well. What are we working on today?"
-          };
+    // 2. State Recovery from Conversation History (if session lost or cold start)
+    if (!session.currentTopic && conversationHistory && conversationHistory.length > 0) {
+      for (let i = conversationHistory.length - 1; i >= 0; i--) {
+        const msg = conversationHistory[i];
+        if (msg.sender === "user") {
+          const detectedTopic = this.detectExplicitTopicFromQuery(msg.content);
+          if (detectedTopic) {
+            session.currentTopic = detectedTopic;
+            session.currentConcept = detectedTopic;
+            break;
+          }
         }
-      } else if (intentResult.intent === "EXPLICIT_NEW_TOPIC" && intentResult.concept) {
+      }
+    }
+
+    // 3. Quiz Me Mode Routing
+    if (mode === "Quiz Me" || qLower.startsWith("quiz me")) {
+      const topic = session.currentTopic || this.detectExplicitTopicFromQuery(query) || "Python";
+      const questions = await this.generateQuizFromDocument(topic, 5, "Medium");
+      
+      const newActiveQuiz: ActiveQuizState = {
+        status: "active",
+        topic,
+        questions,
+        currentQuestionIndex: 0,
+        score: 0
+      };
+
+      serverState.updateTutoringSessionState(conversationId, {
+        activeQuiz: newActiveQuiz,
+        currentTopic: topic,
+        currentConcept: topic
+      });
+
+      const q1 = questions[0];
+      const quizIntro = `Here is Question 1 of ${questions.length} on **${topic}**:\n\n` +
+        `**Question 1**: ${q1.question}\n` +
+        q1.options.map((opt, oIdx) => `   ${String.fromCharCode(65 + oIdx)}. ${opt}`).join("\n") +
+        `\n\nReply with your answer (A, B, C, or D).`;
+
+      return { responseText: quizIntro };
+    }
+
+    // 4. Give Example Mode Routing
+    if (mode === "Give Example" || this.isFollowUpExample(qLower)) {
+      const topic = session.currentTopic || this.detectExplicitTopicFromQuery(query) || "React";
+      serverState.updateTutoringSessionState(conversationId, {
+        currentTopic: topic,
+        currentConcept: topic,
+        tutorState: "WAITING_FOR_UNDERSTANDING"
+      });
+
+      const exampleText = this.getTopicExample(topic, persona === "professional" ? "professional" : "friendly");
+      const formatted = this.applyExplanationStyleFormat(exampleText, userMem.explanationStyle, userMem.customPreferences);
+      return { responseText: formatted };
+    }
+
+    // 5. Intent Classification against Session State
+    const intentResult = this.classifyIntent(query, session, conversationHistory);
+
+    let rawResponse = "";
+
+    // CASE A: USER CONFIRMS UNDERSTANDING ("yes", "yeah", "okk", "understood", "I got it", "haan", "continue", etc.)
+    if (intentResult.intent === "UNDERSTANDING_CONFIRMED") {
+      const activeTopic = session.currentTopic || "React";
+      const conceptQuestion = this.generateConceptCheckQuestion(activeTopic, persona === "professional" ? "professional" : "friendly");
+
+      serverState.updateTutoringSessionState(conversationId, {
+        pendingQuestion: conceptQuestion,
+        pendingQuestionType: "KNOWLEDGE_CHECK",
+        tutorState: "WAITING_FOR_KNOWLEDGE_ANSWER",
+        retryCount: 0
+      });
+
+      const ackIntro = persona === "professional"
+        ? "Great! Let's quickly check your understanding."
+        : "Great! Let's quickly check your understanding.";
+
+      rawResponse = `${ackIntro}\n\n${conceptQuestion}`;
+    }
+
+    // CASE B: USER REJECTS UNDERSTANDING OR IS CONFUSED ("no", "not really", "im confused", "nahi samjha", "explain again")
+    else if (intentResult.intent === "UNDERSTANDING_REJECTED") {
+      const activeTopic = session.currentTopic || "React";
+      const simplerExplanation = this.getSimplerAnalogyExplanation(activeTopic, persona === "professional" ? "professional" : "friendly");
+
+      serverState.updateTutoringSessionState(conversationId, {
+        tutorState: "WAITING_FOR_UNDERSTANDING",
+        lastExplanation: simplerExplanation
+      });
+
+      rawResponse = simplerExplanation;
+    }
+
+    // CASE C: USER ASKS FOR EXAMPLE DURING SESSION
+    else if (intentResult.intent === "FOLLOW_UP_EXAMPLE") {
+      const activeTopic = session.currentTopic || "React";
+      const exampleText = this.getTopicExample(activeTopic, persona === "professional" ? "professional" : "friendly");
+
+      serverState.updateTutoringSessionState(conversationId, {
+        tutorState: "WAITING_FOR_UNDERSTANDING"
+      });
+
+      rawResponse = exampleText;
+    }
+
+    // CASE D: USER ASKS "WHY?" / "HOW?" / "EXPLAIN MORE"
+    else if (intentResult.intent === "FOLLOW_UP_DEEPER") {
+      const activeTopic = session.currentTopic || "React";
+      const explanation = this.getFactualDefinition(activeTopic, persona === "professional" ? "professional" : "friendly");
+
+      serverState.updateTutoringSessionState(conversationId, {
+        tutorState: "WAITING_FOR_UNDERSTANDING"
+      });
+
+      rawResponse = `${explanation}\n\nDoes that make sense? Are you comfortable with this concept?`;
+    }
+
+    // CASE E: USER SUBMITS KNOWLEDGE ANSWER (Evaluating understanding)
+    else if (intentResult.intent === "KNOWLEDGE_ANSWER") {
+      const activeTopic = session.currentTopic || "React";
+      const activeQuestion = session.pendingQuestion || this.generateConceptCheckQuestion(activeTopic, persona === "professional" ? "professional" : "friendly");
+
+      const evaluation = this.evaluateStudentAnswer(query, activeTopic, activeQuestion, persona === "professional" ? "professional" : "friendly");
+
+      if (evaluation.isCorrect) {
         serverState.updateTutoringSessionState(conversationId, {
-          currentTopic: intentResult.topic,
-          currentConcept: intentResult.concept,
-          pendingQuestion: "Is that clear so far?",
-          pendingQuestionType: "UNDERSTANDING_CHECK",
-          tutorState: "WAITING_FOR_UNDERSTANDING",
-        });
-
-        const explanation = this.getFactualDefinition(intentResult.concept);
-        resultResponse = { responseText: `${explanation}\n\nIs that clear so far?` };
-      } else if (intentResult.intent === "UNDERSTANDING_CONFIRMED") {
-        const activeConcept = session.currentConcept || "SQL";
-        const knowledgeQuestion = activeConcept.toLowerCase() === "mongodb"
-          ? "What kind of database is MongoDB?"
-          : activeConcept.toLowerCase() === "global warming"
-          ? "What causes the long-term increase in Earth's temperature in global warming?"
-          : `What is ${activeConcept} mainly used for?`;
-
-        serverState.updateTutoringSessionState(conversationId, {
-          pendingQuestion: knowledgeQuestion,
-          pendingQuestionType: "KNOWLEDGE_CHECK",
-          tutorState: "WAITING_FOR_KNOWLEDGE_ANSWER",
-        });
-
-        resultResponse = { responseText: `Perfect. Let me check your understanding.\n\n${knowledgeQuestion}` };
-      } else if (intentResult.intent === "UNDERSTANDING_REJECTED") {
-        const activeConcept = session.currentConcept || "SQL";
-
-        serverState.updateTutoringSessionState(conversationId, {
-          pendingQuestion: "Is that clearer?",
-          pendingQuestionType: "UNDERSTANDING_CHECK",
-          tutorState: "WAITING_FOR_UNDERSTANDING",
-        });
-
-        const definition = this.getFactualDefinition(activeConcept);
-        resultResponse = { responseText: `No problem. Let me explain ${activeConcept} in a simpler way.\n\n${definition}\n\nIs that clearer?` };
-      } else if (intentResult.intent === "KNOWLEDGE_ANSWER") {
-        const activeConcept = session.currentConcept || "SQL";
-        const activeQuestion = session.pendingQuestion || `What is ${activeConcept} mainly used for?`;
-
-        const evaluation = this.evaluateStudentAnswer(query, activeConcept, activeQuestion);
-
-        if (evaluation.isCorrect) {
-          serverState.updateTutoringSessionState(conversationId, {
-            pendingQuestion: null,
-            pendingQuestionType: null,
-            tutorState: "SESSION_COMPLETE",
-          });
-        } else {
-          serverState.updateTutoringSessionState(conversationId, {
-            tutorState: "WAITING_FOR_KNOWLEDGE_ANSWER",
-          });
-        }
-
-        resultResponse = { responseText: evaluation.feedback };
-      } else if (intentResult.intent === "NEXT_TOPIC_CONFIRMATION") {
-        serverState.updateTutoringSessionState(conversationId, {
-          pendingQuestion: "What would you like to learn next?",
+          pendingQuestion: null,
           pendingQuestionType: null,
-          tutorState: "CASUAL",
+          tutorState: "SESSION_COMPLETE",
+          lastEvaluationResult: "CORRECT"
         });
-
-        resultResponse = { responseText: "Sure. What would you like to learn next?" };
       } else {
-        const fallbackConcept = session.currentConcept || "SQL";
-        const definition = this.getFactualDefinition(fallbackConcept);
-        resultResponse = { responseText: `${definition}\n\nIs that clear so far?` };
+        serverState.updateTutoringSessionState(conversationId, {
+          tutorState: "WAITING_FOR_KNOWLEDGE_ANSWER",
+          retryCount: (session.retryCount || 0) + 1,
+          lastEvaluationResult: evaluation.isPartial ? "PARTIAL" : "INCORRECT"
+        });
+      }
+
+      rawResponse = evaluation.feedback;
+    }
+
+    // CASE F: EXPLICIT NEW TOPIC REQUEST (e.g. "Explain React", "What is Python", "Teach me DSA")
+    else if (intentResult.intent === "EXPLICIT_NEW_TOPIC" && intentResult.topic) {
+      const topic = intentResult.topic;
+      const explanation = this.getFactualDefinition(topic, persona === "professional" ? "professional" : "friendly");
+
+      serverState.updateTutoringSessionState(conversationId, {
+        currentTopic: topic,
+        currentConcept: topic,
+        lastExplanation: explanation,
+        pendingQuestion: "Does that make sense? Are you comfortable with this concept?",
+        pendingQuestionType: "UNDERSTANDING_CHECK",
+        tutorState: "WAITING_FOR_UNDERSTANDING",
+        retryCount: 0
+      });
+
+      rawResponse = `${explanation}\n\nDoes that make sense? Are you comfortable with this concept?`;
+    }
+
+    // CASE G: GREETING WITH NO ACTIVE TOPIC
+    else if (intentResult.intent === "GREETING") {
+      if (qLower.includes("thanks") || qLower.includes("thank you")) {
+        rawResponse = "You're very welcome! Let me know what topic you'd like to learn next.";
+      } else {
+        rawResponse = persona === "professional"
+          ? "Hello! I'm Aarav Mehta, your AI Tutor. What topic or concept would you like to master today?"
+          : "Hey there! I'm Riya Kapoor, your AI Tutor. What topic would you like to explore today?";
+      }
+    }
+
+    // CASE H: CASUAL / FALLBACK
+    else {
+      if (session.currentTopic) {
+        // If an active topic is open, continue with the check
+        rawResponse = `Let's focus on **${session.currentTopic}**.\n\nDoes the explanation make sense, or would you like to check your understanding with a quick question?`;
+      } else {
+        rawResponse = persona === "professional"
+          ? "I'm ready when you are. Tell me what topic you're studying (e.g., 'Explain React' or 'What is Python?')."
+          : "I'm ready! What would you like to learn today? Tell me a topic like 'Explain React' or 'Teach me Python Loops'.";
       }
     }
 
     const formattedText = this.applyExplanationStyleFormat(
-      resultResponse.responseText,
+      rawResponse,
       userMem.explanationStyle,
       userMem.customPreferences
     );
 
-    return {
-      responseText: formattedText,
-      codeSnippet: resultResponse.codeSnippet
-    };
+    return { responseText: formattedText };
   }
 
   static async generateHint(question: string, options?: string[]): Promise<string> {
