@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
       difficulty = "Medium",
       recordAttempt,
       attemptData,
-      idempotencyKey
+      idempotencyKey,
+      extractedText
     } = body;
 
     // Handle recording completed quiz attempts (free)
@@ -44,13 +45,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let materialText: string | undefined = undefined;
+    let materialText: string | undefined = extractedText || undefined;
     let targetTitle = topic || docTitle || "Study Material";
 
-    // 2. MATERIAL VALIDATION: Verify material exists if documentId is provided
+    // 2. MATERIAL VALIDATION: Search database and memory for document
     if (documentId) {
-      const doc = serverState.findDocument(documentId, userId);
-      if (!doc) {
+      const doc =
+        (await serverState.findDocumentAsync(documentId, userId)) ||
+        (await serverState.findDocumentAsync(documentId)) ||
+        serverState.findDocument(documentId, userId) ||
+        serverState.findDocument(documentId);
+
+      if (doc) {
+        targetTitle = doc.title || targetTitle;
+        if (!materialText && doc.chunks && doc.chunks.length > 0) {
+          materialText = doc.chunks.map((c) => c.text).join("\n\n");
+        }
+      } else if (!materialText && !topic) {
         return NextResponse.json(
           {
             success: false,
@@ -60,8 +71,6 @@ export async function POST(req: NextRequest) {
           { status: 404 }
         );
       }
-      targetTitle = doc.title;
-      materialText = doc.chunks.map((c) => c.text).join("\n\n");
     }
 
     console.log("[Material Quiz Processing]", {
@@ -69,6 +78,7 @@ export async function POST(req: NextRequest) {
       docTitle: targetTitle,
       userId,
       hasMaterialText: Boolean(materialText),
+      textLength: materialText ? materialText.length : 0,
       processingStep: "Generating material-grounded 5-question MCQ quiz"
     });
 
