@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, CheckCircle2, XCircle, RefreshCw, Trophy, ArrowRight, HelpCircle, FileText, Video } from "lucide-react";
 import { QuizItem, QuizQuestion, StudyMaterial } from "@/lib/types/student-types";
+import { CreditService } from "@/lib/services/credit-service";
 
 interface QuizLabViewProps {
-  onDeductCredits: (cost: number) => boolean;
+  onDeductCredits?: (cost: number) => boolean;
 }
 
 export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
@@ -51,16 +52,22 @@ export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
 
   const handleGenerateQuiz = async () => {
     if (!selectedMaterialId && materials.length > 0) return;
-    const hasCredits = onDeductCredits(15);
-    if (!hasCredits) return;
+    setQuizError(null);
+
+    const currentCredits = CreditService.getCredits();
+    if (currentCredits < 10) {
+      setQuizError("Insufficient credits. You need at least 10 credits to generate a material quiz.");
+      if (onDeductCredits) onDeductCredits(10);
+      return;
+    }
 
     const selectedMat = materials.find((m) => m.id === selectedMaterialId);
     const targetTitle = selectedMat ? selectedMat.title : "Study Material";
+    const idempotencyKey = `quiz_${Date.now()}`;
 
     setIsGenerating(true);
     setQuizSubmitted(false);
     setUserAnswers({});
-    setQuizError(null);
 
     try {
       const res = await fetch("/api/quiz", {
@@ -70,12 +77,16 @@ export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
           documentId: selectedMaterialId,
           topic: targetTitle,
           questionCount: 5,
-          difficulty
+          difficulty,
+          idempotencyKey
         })
       });
 
       const data = await res.json();
       if (data.success && data.questions && data.questions.length > 0) {
+        if (data.creditsRemaining !== undefined) {
+          CreditService.notifyCreditDeduction(10, data.creditsRemaining);
+        }
         setActiveQuiz({
           id: `quiz_${Date.now()}`,
           title: `Quiz on ${targetTitle}`,
@@ -85,6 +96,9 @@ export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
         });
       } else {
         setQuizError(data.error || "There's not enough readable content in this material to generate a reliable quiz.");
+        if (data.errorCode === "INSUFFICIENT_CREDITS" && onDeductCredits) {
+          onDeductCredits(10);
+        }
       }
     } catch (err) {
       console.error("Quiz API Error:", err);
@@ -133,13 +147,13 @@ export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
       
       {/* Quiz Config Bar */}
       <div className="p-6 rounded-3xl bg-white dark:bg-[#111722] border border-slate-200 dark:border-slate-800 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <h2 className="text-2xl font-black text-slate-900 dark:text-white font-heading">
-              Fuse Lab (Quiz Generator)
+              Material Quiz (Quiz Generator)
             </h2>
             <p className="text-xs text-slate-600 dark:text-slate-300">
-              Generate custom MCQs and practice questions directly from your uploaded materials.
+              Generate custom MCQs and practice questions directly from your uploaded materials • 10 Credits.
             </p>
           </div>
 
@@ -147,21 +161,36 @@ export function QuizLabView({ onDeductCredits }: QuizLabViewProps) {
             <button
               onClick={handleGenerateQuiz}
               disabled={isGenerating || !selectedMaterialId}
-              className="px-6 py-3 rounded-2xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 shadow-md cursor-pointer"
+              className="px-6 py-3 rounded-2xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 shadow-md cursor-pointer shrink-0"
               type="button"
             >
               <Sparkles className="w-4 h-4" />
-              <span>{isGenerating ? "Generating Quiz..." : "Generate AI Quiz"}</span>
+              <span>{isGenerating ? "Generating Quiz..." : "Generate AI Quiz • 10 Credits"}</span>
             </button>
           )}
         </div>
+
+        {quizError && (
+          <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center justify-between">
+            <span>{quizError}</span>
+            {onDeductCredits && (
+              <button
+                onClick={() => onDeductCredits(10)}
+                className="underline text-[11px] font-black cursor-pointer ml-2"
+                type="button"
+              >
+                Upgrade Plan
+              </button>
+            )}
+          </div>
+        )}
 
         {materials.length === 0 && !isLoadingMaterials ? (
           <div className="p-8 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center space-y-2">
             <FileText className="w-8 h-8 text-purple-500 mx-auto" />
             <h3 className="text-sm font-bold text-slate-900 dark:text-white">You haven't added any material yet.</h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Upload your first study material in My Materials to use Fuse Lab for generating quizzes.
+              Upload your first study material in My Materials to generate custom quizzes.
             </p>
           </div>
         ) : (
