@@ -368,6 +368,7 @@ export async function POST(req: NextRequest) {
     };
 
     await serverState.addDocumentAsync(newDoc);
+    console.log("SAVED MATERIAL:", newDoc.id);
 
     const fullContent = newDoc.chunks.map((c) => c.text).join("\n\n");
 

@@ -16,8 +16,11 @@ export async function GET(
       return NextResponse.json({ success: false, error: "Material ID is required." }, { status: 400 });
     }
 
+    console.log("REQUESTED MATERIAL ID:", id);
+
     // Lookup material: try user-filtered lookup first, then fallback to document ID across serverless lambdas/MongoDB
     const doc = (await serverState.findDocumentAsync(id, userId)) || (await serverState.findDocumentAsync(id));
+    console.log("FOUND MATERIAL:", doc ? doc.id : "NOT_FOUND");
     if (!doc) {
       return NextResponse.json({ success: false, error: "Material not found." }, { status: 404 });
     }
