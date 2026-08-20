@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Zap, Check, Lock, Sparkles, CreditCard } from "lucide-react";
+import { X, Check, Lock, Sparkles, CreditCard } from "lucide-react";
 import { CreditService } from "@/lib/services/credit-service";
+import { PLANS } from "@/lib/config/pricing";
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -18,11 +19,13 @@ declare global {
 }
 
 export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) {
-  const [selectedPlan, setSelectedPlan] = useState<"plus" | "pro">("plus");
+  const [selectedPlanId, setSelectedPlanId] = useState<"starter" | "pro">("starter");
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   if (!isOpen) return null;
+
+  const selectedPlan = PLANS[selectedPlanId];
 
   const loadRazorpayScript = () => {
     return new Promise((resolve) => {
@@ -42,8 +45,8 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
     setIsProcessing(true);
     setErrorMessage("");
 
-    const price = selectedPlan === "plus" ? 299 : 799;
-    const addedCredits = selectedPlan === "plus" ? 2000 : 10000;
+    const price = selectedPlan.price;           // ₹149 or ₹399
+    const addedCredits = selectedPlan.credits;  // 1,000 or 3,000
 
     try {
       // 1. Create Razorpay order via backend
@@ -53,6 +56,7 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
         body: JSON.stringify({
           action: "create-order",
           amount: price,
+          planId: selectedPlanId,
         }),
       });
 
@@ -71,7 +75,7 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
       );
 
       if (!isRealRazorpayKey) {
-        // Safe simulation fallback to prevent Razorpay 401 Unauthorized errors when using placeholders
+        // Safe simulation fallback to prevent Razorpay 401 Unauthorized errors
         await verifyAndUpgrade(orderData.orderId, "pay_dummy_dev_id", "dummy_sig", addedCredits);
         return;
       }
@@ -88,7 +92,7 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
         amount: orderData.amount,
         currency: orderData.currency,
         name: "AI4Life Student Workspace",
-        description: `Upgrade to ${selectedPlan.toUpperCase()} Plan (${addedCredits} Credits)`,
+        description: `${selectedPlan.displayName} Plan — ${selectedPlan.creditsDisplay}`,
         order_id: orderData.orderId,
         handler: async function (response: any) {
           await verifyAndUpgrade(
@@ -98,13 +102,11 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
             addedCredits
           );
         },
-        theme: {
-          color: "#3157D5",
-        },
+        theme: { color: "#3157D5" },
       };
 
       const rzp = new window.Razorpay(options);
-      rzp.on("payment.failed", function (response: any) {
+      rzp.on("payment.failed", function () {
         setErrorMessage("Payment failed or cancelled. Please try again.");
         setIsProcessing(false);
       });
@@ -130,6 +132,8 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
           razorpayOrderId: orderId,
           razorpayPaymentId: paymentId,
           razorpaySignature: signature,
+          planId: selectedPlanId,
+          amount: selectedPlan.price,
         }),
       });
 
@@ -149,6 +153,8 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
       setIsProcessing(false);
     }
   };
+
+  const planOptions = [PLANS.starter, PLANS.pro] as const;
 
   return (
     <AnimatePresence>
@@ -176,7 +182,7 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
               Power Up Your Learning
             </h3>
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              Get instant AI credits for RAG document parsing, AI Tutor queries, and Challenge Mode.
+              Get instant AI credits for source-grounded Q&A, AI Tutor queries, and Challenge Mode battles.
             </p>
           </div>
 
@@ -187,57 +193,40 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Plus Plan */}
-            <button
-              onClick={() => setSelectedPlan("plus")}
-              className={`p-5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                selectedPlan === "plus"
-                  ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10 ring-2 ring-blue-500/20"
-                  : "border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50"
-              }`}
-              type="button"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold uppercase text-slate-500">PLUS</span>
-                  <span className="text-xs font-bold text-blue-600 dark:text-sky-400">2,000 Credits</span>
+            {planOptions.map((plan) => (
+              <button
+                key={plan.id}
+                onClick={() => setSelectedPlanId(plan.id as "starter" | "pro")}
+                className={`p-5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                  selectedPlanId === plan.id
+                    ? plan.id === "starter"
+                      ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10 ring-2 ring-blue-500/20"
+                      : "border-indigo-500 bg-indigo-500/5 dark:bg-indigo-500/10 ring-2 ring-indigo-500/20"
+                    : "border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50"
+                }`}
+                type="button"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold uppercase text-slate-500">{plan.name}</span>
+                    <span className={`text-xs font-bold ${plan.id === "starter" ? "text-blue-600 dark:text-sky-400" : "text-indigo-600 dark:text-indigo-400"}`}>
+                      {plan.creditsDisplay}
+                    </span>
+                  </div>
+                  <div className="text-2xl font-black text-slate-900 dark:text-white font-heading">
+                    {plan.priceDisplay} <span className="text-xs text-slate-500 font-normal">{plan.period}</span>
+                  </div>
                 </div>
-                <div className="text-2xl font-black text-slate-900 dark:text-white font-heading">
-                  ₹299 <span className="text-xs text-slate-500 font-normal">/ mo</span>
-                </div>
-              </div>
-              <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-1.5 pt-4">
-                <li className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-blue-500" /> 2,000 AI Credits</li>
-                <li className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-blue-500" /> Qdrant RAG Notes Q&A</li>
-                <li className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-blue-500" /> Mem0 AI Memory Vault</li>
-              </ul>
-            </button>
-
-            {/* Pro Plan */}
-            <button
-              onClick={() => setSelectedPlan("pro")}
-              className={`p-5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                selectedPlan === "pro"
-                  ? "border-indigo-500 bg-indigo-500/5 dark:bg-indigo-500/10 ring-2 ring-indigo-500/20"
-                  : "border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50"
-              }`}
-              type="button"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold uppercase text-slate-500">PRO</span>
-                  <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">10,000 Credits</span>
-                </div>
-                <div className="text-2xl font-black text-slate-900 dark:text-white font-heading">
-                  ₹799 <span className="text-xs text-slate-500 font-normal">/ mo</span>
-                </div>
-              </div>
-              <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-1.5 pt-4">
-                <li className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-indigo-500" /> 10,000 AI Credits</li>
-                <li className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-indigo-500" /> Tavily Web Research</li>
-                <li className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-indigo-500" /> Priority Processing</li>
-              </ul>
-            </button>
+                <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-1.5 pt-4">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-center gap-1.5">
+                      <Check className={`w-3.5 h-3.5 ${plan.id === "starter" ? "text-blue-500" : "text-indigo-500"}`} />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              </button>
+            ))}
           </div>
 
           <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
@@ -253,7 +242,11 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
               type="button"
             >
               <CreditCard className="w-4 h-4" />
-              <span>{isProcessing ? "Processing Razorpay Order..." : `Pay ${selectedPlan === "plus" ? "₹299" : "₹799"} via Razorpay`}</span>
+              <span>
+                {isProcessing
+                  ? "Processing Razorpay Order..."
+                  : `Pay ${selectedPlan.priceDisplay} via Razorpay`}
+              </span>
             </button>
           </div>
         </motion.div>

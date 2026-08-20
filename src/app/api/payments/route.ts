@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { AuthService } from "@/lib/services/auth-service";
 import { UserService } from "@/lib/services/user-service";
 import { RazorpayService } from "@/lib/services/razorpay-service";
+import { getCreditsForPlanPrice } from "@/lib/config/pricing";
 
 export async function POST(request: Request) {
   try {
@@ -11,12 +12,19 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { action, razorpayOrderId, razorpayPaymentId, razorpaySignature, amount } = body;
+    const { action, razorpayOrderId, razorpayPaymentId, razorpaySignature, amount, planId } = body;
 
     // 1. Create Order for Authenticated Clerk User
     if (action === "create-order") {
-      const order = await RazorpayService.createOrder(amount || 499, `rcpt_${clerkUserId}_${Date.now()}`);
-      
+      // Validate amount is one of the known plan prices
+      const validAmounts = [149, 399];
+      const safeAmount = validAmounts.includes(amount) ? amount : 149;
+
+      const order = await RazorpayService.createOrder(
+        safeAmount,
+        `rcpt_${clerkUserId}_${Date.now()}`
+      );
+
       // Sync Clerk user with MongoDB
       await UserService.syncClerkUser(clerkUserId);
 
@@ -26,6 +34,7 @@ export async function POST(request: Request) {
         amount: order.amount,
         currency: order.currency,
         keyId: order.keyId,
+        planId: planId || "starter",
       });
     }
 
@@ -45,14 +54,25 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: "Razorpay signature verification failed." }, { status: 400 });
       }
 
+      // Determine credits from the paid amount
+      const creditsGranted = getCreditsForPlanPrice(amount || 149);
+
       // Server-side MongoDB subscription update (never trust frontend status)
-      await UserService.updateSubscription(clerkUserId, "premium", "active");
+      await UserService.updateSubscription(
+        clerkUserId,
+        "premium",
+        "active",
+        undefined,
+        undefined,
+        amount || 149
+      );
 
       return NextResponse.json({
         success: true,
-        message: "Payment verified successfully. Premium features unlocked!",
-        plan: "premium",
+        message: "Payment verified successfully. Credits unlocked!",
+        plan: planId || "starter",
         subscriptionStatus: "active",
+        creditsGranted,
       });
     }
 

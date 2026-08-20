@@ -1,5 +1,6 @@
 import { getDb } from "../db/mongodb";
 import { UserDoc } from "../db/models";
+import { NEW_USER_FREE_CREDITS, getCreditsForPlanPrice } from "../config/pricing";
 
 export class UserService {
   // Sync or create a MongoDB user record bound to Clerk User ID
@@ -15,7 +16,7 @@ export class UserService {
       name: name || "Student",
       email: email || `${clerkUserId}@student.ai4life.com`,
       imageUrl: imageUrl || "",
-      credits: 420,
+      credits: NEW_USER_FREE_CREDITS,
       plan: "free",
       subscriptionStatus: "inactive",
       createdAt: new Date().toISOString(),
@@ -66,7 +67,8 @@ export class UserService {
     plan: "free" | "premium",
     subscriptionStatus: "inactive" | "active" | "cancelled" | "expired",
     razorpayCustomerId?: string,
-    razorpaySubscriptionId?: string
+    razorpaySubscriptionId?: string,
+    paidAmountINR?: number
   ): Promise<boolean> {
     const db = await getDb();
     if (!db) return false;
@@ -78,7 +80,10 @@ export class UserService {
     };
 
     if (plan === "premium" && subscriptionStatus === "active") {
-      updateFields.credits = 1420; // Upgrade credit boost
+      // Grant credits based on the plan amount paid — reads from pricing config
+      updateFields.credits = paidAmountINR
+        ? getCreditsForPlanPrice(paidAmountINR)
+        : getCreditsForPlanPrice(149); // Default: Starter plan credits
     }
 
     if (razorpayCustomerId) updateFields.razorpayCustomerId = razorpayCustomerId;

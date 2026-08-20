@@ -155,7 +155,7 @@ function RadarChart({
 }
 
 export function ChallengeModeView({ onDeductCredits }: ChallengeModeViewProps) {
-  const [userCredits, setUserCredits] = useState(420);
+  const [userCredits, setUserCredits] = useState(200);
   const [topicInput, setTopicInput] = useState("React");
   const [battleMode, setBattleMode] = useState<"general" | "material">("general");
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>("");

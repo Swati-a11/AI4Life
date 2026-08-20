@@ -34,7 +34,7 @@ interface StudentShellProps {
 }
 
 export function StudentShell({ currentTab, onTabChange, children }: StudentShellProps) {
-  const [credits, setCredits] = useState<number>(420);
+  const [credits, setCredits] = useState<number>(200);
   const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);

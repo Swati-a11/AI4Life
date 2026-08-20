@@ -1,3 +1,5 @@
+import { NEW_USER_FREE_CREDITS } from "../config/pricing";
+
 export interface CreditTransaction {
   id: string;
   userId?: string;
@@ -26,7 +28,7 @@ export class CreditService {
         if (!isNaN(parsed)) return parsed;
       }
     }
-    return 420;
+    return NEW_USER_FREE_CREDITS;
   }
 
   private static getInitialCredits(userId?: string): number {

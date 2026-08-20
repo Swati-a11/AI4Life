@@ -3,48 +3,49 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Check, ArrowRight, Zap } from "lucide-react";
+import { PLANS, FREE_PLAN } from "@/lib/config/pricing";
 
 export function PricingSection() {
-  const [creditUsage, setCreditUsage] = useState(1240);
+  const [creditUsage, setCreditUsage] = useState(620);
 
   const plans = [
     {
-      name: "FREE",
-      price: "₹0",
-      credits: "100 credits / month",
+      name: FREE_PLAN.name,
+      price: FREE_PLAN.priceDisplay,
+      credits: `${FREE_PLAN.creditsDisplay} / month`,
       diffs: [
-        "100 AI credits monthly",
+        `${FREE_PLAN.creditsDisplay} AI credits monthly`,
         "Upload basic PDFs & notes",
         "Standard answer generation"
       ],
-      cta: "Start Free",
-      popular: false
+      cta: FREE_PLAN.ctaLabel,
+      popular: FREE_PLAN.popular
     },
     {
-      name: "PLUS",
-      price: "₹299",
-      period: "/ month",
-      credits: "2,000 credits / month",
+      name: PLANS.starter.name,
+      price: PLANS.starter.priceDisplay,
+      period: PLANS.starter.period,
+      credits: `${PLANS.starter.creditsDisplay} / month`,
       diffs: [
-        "2,000 AI credits monthly",
+        `${PLANS.starter.creditsDisplay} AI credits monthly`,
         "Persistent context memory",
         "Audio transcripts & quizzes"
       ],
-      cta: "Get Plus",
-      popular: true
+      cta: PLANS.starter.ctaLabel,
+      popular: PLANS.starter.popular
     },
     {
-      name: "PRO",
-      price: "₹799",
-      period: "/ month",
-      credits: "10,000 credits / month",
+      name: PLANS.pro.name,
+      price: PLANS.pro.priceDisplay,
+      period: PLANS.pro.period,
+      credits: `${PLANS.pro.creditsDisplay} / month`,
       diffs: [
-        "10,000 AI credits monthly",
-        "Multi-workspace sharing",
-        "Deep Web synthesis"
+        `${PLANS.pro.creditsDisplay} AI credits monthly`,
+        "AI Se Baazi Challenge Mode",
+        "Priority Processing"
       ],
-      cta: "Get Pro",
-      popular: false
+      cta: PLANS.pro.ctaLabel,
+      popular: PLANS.pro.popular
     },
     {
       name: "BUSINESS",
@@ -84,13 +85,13 @@ export function PricingSection() {
               <Zap className="w-4 h-4 fill-current" />
               Usage Meter
             </span>
-            <span>{creditUsage.toLocaleString()} / 2,000 credits used</span>
+            <span>{creditUsage.toLocaleString()} / {PLANS.starter.credits.toLocaleString()} credits used</span>
           </div>
 
           <div className="w-full h-2.5 rounded-full bg-slate-200 dark:bg-slate-950 overflow-hidden border border-slate-300/40 dark:border-slate-800">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${(creditUsage / 2000) * 100}%` }}
+              animate={{ width: `${(creditUsage / PLANS.starter.credits) * 100}%` }}
               transition={{ duration: 0.6, ease: "easeOut" }}
               className="h-full bg-gradient-to-r from-cyan-400 to-sky-400"
             />
@@ -99,7 +100,7 @@ export function PricingSection() {
           <div className="flex items-center justify-between text-[11px] text-slate-500">
             <span>Credits reset monthly.</span>
             <button
-              onClick={() => setCreditUsage((prev) => (prev >= 1800 ? 200 : prev + 350))}
+              onClick={() => setCreditUsage((prev) => (prev >= 900 ? 200 : prev + 350))}
               className="text-cyan-600 dark:text-cyan-400 underline font-semibold hover:opacity-80"
               type="button"
             >

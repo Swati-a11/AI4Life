@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Zap, Check, Loader2 } from "lucide-react";
+import { ArrowRight, Zap, Loader2 } from "lucide-react";
+import { PLANS, FREE_PLAN } from "@/lib/config/pricing";
 
 declare global {
   interface Window {
@@ -49,9 +50,7 @@ const loadRazorpayScript = (): Promise<boolean> => {
 };
 
 export function PricingSimple() {
-  const user = null;
-
-  const [creditUsage, setCreditUsage] = useState(1240);
+  const [creditUsage, setCreditUsage] = useState(620);
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");
 
@@ -62,24 +61,19 @@ export function PricingSimple() {
   }, []);
 
   const handleCtaClick = async (plan: any) => {
-    if (plan.name === "FREE") {
+    if (plan.id === "free") {
       window.location.href = "/student";
       return;
     }
-
-    if (plan.name === "BUSINESS") {
+    if (plan.id === "business") {
       window.location.href = "mailto:support@ai4life.com";
       return;
     }
-
-    const priceAmount = plan.amount || (plan.name === "PLUS (₹299)" ? 299 : 399);
-
-    // Launch payment process directly
-    await startRazorpayCheckout(plan.name, priceAmount);
+    await startRazorpayCheckout(plan.id, plan.name, plan.price);
   };
 
-  const startRazorpayCheckout = async (planName: string, priceAmount: number) => {
-    setProcessingPlan(planName);
+  const startRazorpayCheckout = async (planId: string, planName: string, priceAmount: number) => {
+    setProcessingPlan(planId);
     setPaymentState("creating_order");
 
     try {
@@ -92,6 +86,7 @@ export function PricingSimple() {
           body: JSON.stringify({
             action: "create-order",
             amount: priceAmount,
+            planId,
           }),
         });
         orderData = await res.json();
@@ -110,23 +105,24 @@ export function PricingSimple() {
         return;
       }
 
-      const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || orderData?.keyId || process.env.RAZORPAY_KEY_ID || "rzp_test_SpFs6";
-      const userName = "Swati Kumari";
-      const userEmail = "swati@student.ai4life.com";
+      const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || orderData?.keyId || "rzp_test_SpFs6";
+      const userName = "Student";
+      const userEmail = "student@ai4life.com";
 
-      // 3. Construct Razorpay Options & open Checkout Gateway directly
+      // 3. Construct Razorpay Options & open Checkout Gateway
       const options = {
         key: keyId,
         amount: (orderData?.amount || Math.round(priceAmount * 100)),
         currency: orderData?.currency || "INR",
         name: "AI4Life",
-        description: `AI4Life ${planName}`,
+        description: `AI4Life ${planName} Plan`,
         order_id: (orderData?.success && orderData?.orderId) ? orderData.orderId : undefined,
         prefill: {
           name: userName,
           email: userEmail,
         },
         notes: {
+          planId,
           plan: planName,
           userId: "default_student_user",
         },
@@ -136,12 +132,11 @@ export function PricingSimple() {
             response.razorpay_order_id || orderData?.orderId,
             response.razorpay_payment_id,
             response.razorpay_signature,
+            planId,
             priceAmount
           );
         },
-        theme: {
-          color: "#3157D5",
-        },
+        theme: { color: "#3157D5" },
         modal: {
           ondismiss: function () {
             setPaymentState("cancelled");
@@ -172,6 +167,7 @@ export function PricingSimple() {
     orderId: string,
     paymentId: string,
     signature: string,
+    planId: string,
     priceAmount: number
   ) => {
     try {
@@ -183,6 +179,8 @@ export function PricingSimple() {
           razorpayOrderId: orderId,
           razorpayPaymentId: paymentId,
           razorpaySignature: signature,
+          planId,
+          amount: priceAmount,
         }),
       });
 
@@ -205,43 +203,47 @@ export function PricingSimple() {
 
   const plans = [
     {
-      name: "FREE",
-      price: "₹0",
-      amount: 0,
-      credits: "100 AI credits / month",
-      cta: "Start Free",
-      popular: false,
-      borderStyle: "border-slate-200 dark:border-slate-800"
+      id: "free",
+      name: FREE_PLAN.name,
+      price: FREE_PLAN.priceDisplay,
+      amount: FREE_PLAN.price,
+      credits: `${FREE_PLAN.creditsDisplay} / month`,
+      cta: FREE_PLAN.ctaLabel,
+      popular: FREE_PLAN.popular,
+      borderStyle: FREE_PLAN.borderStyle,
     },
     {
-      name: "PLUS (₹299)",
-      price: "₹299",
-      amount: 299,
-      period: "/ month",
-      credits: "2,000 AI credits / month",
-      cta: "Choose Plus",
-      popular: true,
-      borderStyle: "border-[#3157D5] dark:border-[#4F8CFF] shadow-xl ring-2 ring-blue-500/20"
+      id: PLANS.starter.id,
+      name: PLANS.starter.name,
+      price: PLANS.starter.priceDisplay,
+      amount: PLANS.starter.price,
+      period: PLANS.starter.period,
+      credits: `${PLANS.starter.creditsDisplay} / month`,
+      cta: PLANS.starter.ctaLabel,
+      popular: PLANS.starter.popular,
+      borderStyle: PLANS.starter.borderStyle,
     },
     {
-      name: "PLUS (₹399)",
-      price: "₹399",
-      amount: 399,
-      period: "/ month",
-      credits: "5,000 AI credits / month",
-      cta: "Choose Plus",
-      popular: false,
-      borderStyle: "border-indigo-500/40 dark:border-indigo-500/40"
+      id: PLANS.pro.id,
+      name: PLANS.pro.name,
+      price: PLANS.pro.priceDisplay,
+      amount: PLANS.pro.price,
+      period: PLANS.pro.period,
+      credits: `${PLANS.pro.creditsDisplay} / month`,
+      cta: PLANS.pro.ctaLabel,
+      popular: PLANS.pro.popular,
+      borderStyle: PLANS.pro.borderStyle,
     },
     {
+      id: "business",
       name: "BUSINESS",
       price: "Custom",
       amount: 0,
       credits: "Flexible usage for teams",
       cta: "Talk to us",
       popular: false,
-      borderStyle: "border-slate-300 dark:border-slate-800"
-    }
+      borderStyle: "border-slate-300 dark:border-slate-800",
+    },
   ];
 
   return (
@@ -268,13 +270,13 @@ export function PricingSimple() {
               <Zap className="w-4 h-4 fill-current" />
               Credit Usage
             </span>
-            <span className="text-slate-900 dark:text-white font-mono">{creditUsage.toLocaleString()} / 2,000 credits</span>
+            <span className="text-slate-900 dark:text-white font-mono">{creditUsage.toLocaleString()} / {PLANS.starter.credits.toLocaleString()} credits</span>
           </div>
 
           <div className="w-full h-2.5 rounded-full bg-slate-200 dark:bg-slate-900 overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${(creditUsage / 2000) * 100}%` }}
+              animate={{ width: `${(creditUsage / PLANS.starter.credits) * 100}%` }}
               transition={{ duration: 0.5, ease: "easeOut" }}
               className="h-full bg-[#3157D5] dark:bg-[#4F8CFF]"
             />
@@ -283,7 +285,7 @@ export function PricingSimple() {
           <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400">
             <span>Credits reset monthly</span>
             <button
-              onClick={() => setCreditUsage((prev) => (prev >= 1800 ? 300 : prev + 300))}
+              onClick={() => setCreditUsage((prev) => (prev >= 900 ? 200 : prev + 300))}
               className="text-[#3157D5] dark:text-[#4F8CFF] font-bold hover:underline cursor-pointer"
               type="button"
             >
@@ -295,10 +297,10 @@ export function PricingSimple() {
         {/* 4 Distinct Pricing Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {plans.map((plan) => {
-            const isThisProcessing = processingPlan === plan.name;
+            const isThisProcessing = processingPlan === plan.id;
             return (
               <div
-                key={plan.name}
+                key={plan.id}
                 className={`rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all bg-white dark:bg-[#111722] border ${plan.borderStyle}`}
               >
                 <div>
