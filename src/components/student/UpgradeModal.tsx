@@ -48,26 +48,6 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
     const price = selectedPlan.price;           // ₹149 or ₹399
     const addedCredits = selectedPlan.credits;  // 1,000 or 3,000
 
-    // Early check — skip Razorpay if no real key configured
-    const envKeyId = typeof window !== "undefined"
-      ? (process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "")
-      : "";
-    const isRealKey = Boolean(
-      envKeyId &&
-      envKeyId.startsWith("rzp_") &&
-      !envKeyId.includes("your_") &&
-      !envKeyId.includes("SpFs6")
-    );
-
-    if (!isRealKey) {
-      // No real Razorpay key — show error in modal, do NOT auto-close or grant credits
-      setErrorMessage(
-        "Payment gateway not configured. Add NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your environment variables to enable payments."
-      );
-      setIsProcessing(false);
-      return;
-    }
-
     try {
       // 1. Create Razorpay order via backend
       const res = await fetch("/api/payments", {
@@ -85,30 +65,21 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
         throw new Error(orderData.error || "Failed to initialize payment order.");
       }
 
-      // 2. Check if real Razorpay Key ID is provided
-      const isRealRazorpayKey = Boolean(
-        orderData.keyId &&
-        orderData.keyId.startsWith("rzp_") &&
-        !orderData.keyId.includes("key_id") &&
-        !orderData.keyId.includes("your_") &&
-        orderData.keyId.length > 15
-      );
-
-      if (!isRealRazorpayKey) {
-        // Safe simulation fallback to prevent Razorpay 401 Unauthorized errors
-        await verifyAndUpgrade(orderData.orderId, "pay_dummy_dev_id", "dummy_sig", addedCredits);
-        return;
-      }
-
       const isScriptLoaded = await loadRazorpayScript();
       if (!isScriptLoaded || !window.Razorpay) {
-        await verifyAndUpgrade(orderData.orderId, "pay_dummy_dev_id", "dummy_sig", addedCredits);
+        setErrorMessage("Unable to load Razorpay payment gateway.");
+        setIsProcessing(false);
         return;
       }
 
-      // 3. Trigger Razorpay Checkout Window
+      const keyId =
+        orderData.keyId ||
+        (typeof window !== "undefined" ? process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID : "") ||
+        "rzp_test_SpFs6";
+
+      // 2. Trigger Razorpay Checkout Window
       const options = {
-        key: orderData.keyId,
+        key: keyId,
         amount: orderData.amount,
         currency: orderData.currency,
         name: "AI4Life Student Workspace",
@@ -123,17 +94,24 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
           );
         },
         theme: { color: "#3157D5" },
+        modal: {
+          ondismiss: function () {
+            setIsProcessing(false);
+          },
+        },
       };
 
       const rzp = new window.Razorpay(options);
-      rzp.on("payment.failed", function () {
+      rzp.on("payment.failed", function (resp: any) {
+        console.error("Razorpay payment failed:", resp);
         setErrorMessage("Payment failed or cancelled. Please try again.");
         setIsProcessing(false);
       });
       rzp.open();
     } catch (err: any) {
-      console.warn("Razorpay Checkout warning, using fallback verification:", err);
-      await verifyAndUpgrade(`order_${Date.now()}`, `pay_${Date.now()}`, "sig", addedCredits);
+      console.error("Razorpay checkout error:", err);
+      setErrorMessage(err.message || "Failed to open Razorpay checkout.");
+      setIsProcessing(false);
     }
   };
 
